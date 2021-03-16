@@ -1,30 +1,31 @@
 ---
-title: Arced Clock?
+title: Arched Clock?
 date: "2021-05-01T22:12:03.284Z"
 description: "It all started with an arched clock with neopixel leds."
 ---
 
-This is my first post on my new fake blog! How exciting!
+This is my first post on my new blog! How exciting!
 
 I'm sure I'll write a lot more interesting things in the future.
 
 Oh, and here's a great quote from this Wikipedia on
-[salted duck eggs](https://en.wikipedia.org/wiki/Salted_duck_egg).
+[Maker Culture](https://en.wikipedia.org/wiki/Maker_culture).
 
-> A salted ducqqqk egg is a Chinese preserved food product made by soaking duck
-> eggs in brine, or packing each egg in damp, salted charcoal. In Asian
-> supermarkets, these eggs are sometimes sold covered in a thick layer of salted
-> charcoal paste. The eggs may also be sold with the salted paste removed,
-> wrapped in plastic, and vacuum packed. From the salt curing process, the
-> salted duck eggs have a briny aroma, a gelatin-like egg white and a
-> firm-textured, round yolk that is bright orange-red in color.
+> The maker culture is a contemporary subculture representing a technology-based extension of 
+> DIY culture[citation needed] that intersects with hacker culture (which is less concerned with 
+> physical objects as it focuses on software) and revels in the creation of new devices as well 
+> as tinkering with existing ones. The maker culture in general supports open-source hardware. 
+> Typical interests enjoyed by the maker culture include engineering-oriented pursuits such as 
+> electronics, robotics, 3-D printing, and the use of computer numeric control tools, as well as 
+> more traditional activities such as metalworking, woodworking, and, mainly, its predecessor, 
+> traditional arts and crafts.
 
-![Chinese Salty Egg](./salty_egg.jpg)
+![Makers](https://www.themakersamsterdam.com/static/logo.JPG)
 
 You can also write code blocks here!
 
 ```js
-const saltyDuckEgg = "chinese preserved food product"
+const maker = "creatively inspired being"
 ```
 
 | Number | Title                                    | Year |
