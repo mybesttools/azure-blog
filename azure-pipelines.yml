@@ -29,3 +29,10 @@ steps:
     Destination: 'AzureBlob'
     storage: 'gatsbymybesttools'
     ContainerName: '/web$'
+- task: AzureFileCopy@4
+  inputs:
+    SourcePath: '/public'
+    azureSubscription: 'MyBestTools Subscription(d0502a43-f552-4842-a4fd-fe902747a981)'
+    Destination: 'AzureBlob'
+    storage: 'gatsbymybesttools'
+    ContainerName: '$web'
