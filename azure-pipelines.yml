@@ -1,4 +1,5 @@
 # Node.js
+
 # Build a general Node.js project with npm.
 # Add steps that analyze code, save build artifacts, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
@@ -21,3 +22,10 @@ steps:
     npm run build
     gatsby build
   displayName: 'npm install and build'
+- task: AzureFileCopy@4
+  inputs:
+    SourcePath: '/public'
+    azureSubscription: 'MyBestTools Subscription(d0502a43-f552-4842-a4fd-fe902747a981)'
+    Destination: 'AzureBlob'
+    storage: 'gatsbymybesttools'
+    ContainerName: '/web$'
