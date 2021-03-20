@@ -22,4 +22,3 @@ Oh, and here's a great quote from this Wikipedia on
 
 ![Makers](https://www.themakersamsterdam.com/static/logo.JPG)
 
-You can also write code blocks here!
