@@ -1,12 +1,12 @@
 ---
 title: Blog Start
 date: "2021-03-15T19:05:32.169Z"
-description: I was triggered having a conversation with my collegue, who stated my makes deserve some more visibility. That inspired me to create a blog...
+description: I was triggered having a conversation with my collegue, which stated my makes deserve some more visibility. That inspired me to create a blog...
 ---
 
 As we spoke about development and everyday sorrows during the crisis, we ended up 
 talking about what else keeps me busy. Of course I do like to show off a little with
-some internet of things projects I'm busy with in my free time, which triggered a reaction
+some [Internet of Things](https://en.wikipedia.org/wiki/Internet_of_things) projects I'm busy with in my free time, which triggered a reaction
 like 'Cool, you should present that someday during a dev-thursday'.
 I do like to share my code, as I also take advantage of other devs sharing their code.
 
