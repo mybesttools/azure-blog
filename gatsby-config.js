@@ -8,7 +8,7 @@ module.exports = {
     description: `A blog about tools and makes.`,
     siteUrl: `https://mybesttools.com/`,
     social: {
-      twitter: `Mike_Something`,
+      twitter: `mike_something_`,
     },
   },
   plugins: [
@@ -118,7 +118,7 @@ module.exports = {
         background_color: `#ffffff`,
         theme_color: `#663399`,
         display: `minimal-ui`,
-        icon: `src/images/gatsby-icon.png`, // This path is relative to the root of the site.
+        icon: `src/images/mbt-icon.png`, // This path is relative to the root of the site.
       },
     },
     `gatsby-plugin-react-helmet`,

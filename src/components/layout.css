@@ -1,0 +1,62 @@
+/* CSS variables */
+:root {
+  --mainDarkBlue: #170579;
+  --mainBlue: rgb(72, 124, 235);
+  --mainGrey: #ece8dc;
+  --mainWhite: #fff;
+  --mainDark: #222;
+}
+
+body {
+  background: var(--mainWhite);
+  color: var(--mainDark);
+  font-family: Verdana, Geneva, Tahoma, sans-serif !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Courier New", Courier, monospace !important;
+  letter-spacing: 0.25rem !important;
+}
+.text-yellow {
+  color: var(--mainBlue);
+}
+.cart-icon {
+  cursor: pointer;
+  color: var(--mainBlue);
+  font-size: 2rem;
+}
+.default-background,
+.about-background {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(rgba(2, 10, 116, 0.5), rgba(21, 53, 197, 0.5));
+  background-position: center;
+  background-size: cover;
+}
+
+.about-background {
+  min-height: 60vh;
+}
+
+.btn-yellow {
+  color: var(--mainBlue);
+  border-color: var(--mainBlue);
+}
+.btn-yellow:hover {
+  background: var(--mainBlue);
+  color: var(--mainDarkBlue);
+}
+.footer {
+  background: var(--mainDarkBlue);
+}
+.menu,
+.contact {
+  background: var(--mainGrey);
+}
