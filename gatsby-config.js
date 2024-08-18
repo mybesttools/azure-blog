@@ -3,7 +3,7 @@ module.exports = {
     title: `My Best Tools Blog`,
     author: {
       name: `Mike van der Sluis`,
-      summary: `who lives in Amsterdam and works in The Hague building useful things.`,
+      summary: `wich lives in Amsterdam and works in The Hague building useful things.`,
     },
     description: `A blog about tools and makes.`,
     siteUrl: `https://mybesttools.com/`,
