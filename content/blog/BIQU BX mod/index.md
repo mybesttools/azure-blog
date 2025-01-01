@@ -1,3 +1,8 @@
+---
+title: BIQU BX MOD
+date: "2025-01-01T07:48:03.284Z"
+description: "Howto for installing Klipper on the Big Tree Tech BIQU BX."
+--- 
 # Klipper on the BIQU BX
 The Biqu BX is now supported in mainstream klipper! I updated the steps a bit to make it a little clearer
 _**NOTE: CAN will not work on this board due to a hardware mis-configuration**_
