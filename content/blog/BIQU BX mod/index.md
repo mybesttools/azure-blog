@@ -15,7 +15,7 @@ First, a few requirements:
    * For Fluidd and Mainsail, I recomment KlipperScreen
 3. You **MUST** have removed the Z endstop physical switch. Not disconnected, but completely removed.
 
-Ok, so let's get started.
+Ok, so let's get started. 
 
 # Details 
 
