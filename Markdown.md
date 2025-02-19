@@ -203,6 +203,6 @@ This paragraph has some `code` in it.
 
     This paragraph has some `code` in it.
 
-![Alt Text](https://placehold.it/200x50 "Image Title")
+![Alt Text](https://alternative.me/media/256/placehold-it-icon-nzrytw2eqys4zyft-c.png "Image Title")
 
     ![Alt Text](https://placehold.it/200x50 "Image Title")
