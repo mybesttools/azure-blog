@@ -5,7 +5,8 @@
     "build": "next build",
     "start": "next start"
   },
-  "dependencies": {
+  "dependencies": 
+  {
     "classnames": "^2.5.1",
     "date-fns": "^3.6.0",
     "gray-matter": "^4.0.3",
@@ -25,3 +26,4 @@
     "typescript": "^5.5.2"
   }
 }
+
