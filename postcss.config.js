@@ -4,3 +4,11 @@ module.exports = {
     autoprefixer: {},
   },
 };
+
+const nextConfig = {
+  images: {
+    unoptimized: true,
+  },
+  trailingSlash: true,
+  output: "export",
+};
