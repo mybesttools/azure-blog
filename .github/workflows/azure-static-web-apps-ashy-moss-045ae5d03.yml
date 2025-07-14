@@ -14,6 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
+      - name: "Setup User Configuration"
+        run: |
+          # Configure git user for commit actions
+          # This is required to ensure that the GitHub Actions bot can commit changes if needed
+          # For example, if you are using a static site generator that requires a build step
+          # that generates files that need to be committed back to the repository.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          chmod -R 777 .
       - uses: actions/checkout@v2
         with:
           submodules: true
@@ -30,9 +39,6 @@ jobs:
           api_location: "api" # Api source code path - optional
           output_location: "public" # Built app content directory - optional
           ###### End of Repository/Build Configurations ######
-          env:
-            CONTENTFUL_ACCESS_TOKEN:${{secrets.CONTENTFUL_ACCESS_TOKEN}}
-            CONTENTFUL_SPACE_ID:${{secrets.CONTENTFUL_SPACE_ID}}
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
