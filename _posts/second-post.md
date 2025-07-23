@@ -5,7 +5,7 @@ coverImage: "/assets/blog/second-post/neopixel-clock.png"
 date: "2021-03-20T07:48:03.284Z"
 author:
   name: "Mike van der Sluis"
-  picture: "/assets/blog/authors/mike.png"
+  picture: "/assets/blog/authors/mike.jpg"
 ogImage:
   url: "/assets/blog/second-post/neopixel-clock.png"
 ---

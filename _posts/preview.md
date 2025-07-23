@@ -5,7 +5,7 @@ coverImage: "/assets/blog/preview/cover.jpg"
 date: "2025-03-16T05:35:07.322Z"
 author:
   name: "Mike van der Sluis"
-  picture: "/assets/blog/authors/mike.png"
+  picture: "/assets/blog/authors/mike.jpg"
 ogImage:
   url: "/assets/blog/preview/cover.jpg"
 ---
