@@ -10,22 +10,15 @@ type Props = {
 
 export function Disqus({ slug, title }: Props) {
   const { resolvedTheme } = useTheme();
-  
-  const repoId = process.env.NEXT_PUBLIC_GISCUS_REPO_ID;
-  const categoryId = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID;
-
-  if (!repoId || !categoryId) {
-    return null;
-  }
 
   return (
     <div className="max-w-5xl mx-auto mt-12">
       <Giscus
         id="comments"
         repo="mybesttools/azure-blog"
-        repoId={repoId}
+        repoId="348095374"
         category="Q&A"
-        categoryId={categoryId}
+        categoryId="DIC_kwDOFL-Djs4Cz9sL"
         mapping="pathname"
         strict="0"
         reactionsEnabled="1"
