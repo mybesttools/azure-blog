@@ -1,0 +1,41 @@
+{
+  "version": "2.0",
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  },
+  "functionTimeout": "00:20:00",
+  "httpWorkerProcess": {
+    "description": {
+      "defaultExecutablePath": "python",
+      "defaultWorkerPath": "worker.py",
+      "arguments": []
+    }
+  },
+  "http": {
+    "maxOutstandingRequests": 5,
+    "maxConcurrentRequests": 1,
+    "dynamicThrottlesEnabled": false,
+    "hsts": {
+      "isEnabled": false
+    },
+    "customHeaders": {
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "logging": {
+    "logLevel": {
+      "default": "Information"
+    }
+  },
+  "extensions": {
+    "blobs": {
+      "maxDegreeOfParallelism": 2,
+      "scanInterval": "00:00:30"
+    },
+    "http": {
+      "routePrefix": "api",
+      "maxRequestBodySize": 8388608
+    }
+  }
+}

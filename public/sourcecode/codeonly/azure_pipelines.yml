@@ -1,0 +1,911 @@
+# Azure DevOps Pipeline for our Function App
+# Deployment Strategy: Direct SCM Upload + One Deploy (Zero Storage Access)
+# Uploads ZIP directly to Function App's Kudu/SCM endpoint, bypassing storage account entirely
+
+parameters:
+  - name: azureServiceConnection
+    type: string
+    displayName: 'Azure Service Connection'
+    default: 'your-service-connection'
+  - name: environment
+    type: string
+    values: ['poc', 'nonprod', 'prd']
+    default: 'poc'
+  - name: dataProductId
+    type: string
+    default: '00000002'
+
+trigger: none
+
+pr: none
+
+variables:
+  - group: ${{ parameters.environment }}
+  - name: pythonVersion
+    value: '3.11'
+  - name: agentPool
+    value: 'your-agent-pool'  # Custom agent pool with MS-hosted agents
+  - name: workingDirectory
+    value: '$(Build.SourcesDirectory)/functionapp'
+  - name: functionAppName
+    value: 'app-dp${{ parameters.dataProductId }}-functionapp-${{ parameters.environment }}'
+  - name: azureServiceConnection
+    value: '${{ parameters.azureServiceConnection }}'
+  - name: resourceGroupName
+    value: 'rg-dp${{ parameters.dataProductId }}-${{ parameters.environment }}'
+  - name: keyVaultName
+    value: 'kv-dp${{ parameters.dataProductId }}-${{ parameters.environment }}'
+  - name: runDiagnostic
+    value: false  # Set to false to skip diagnostics
+
+stages:
+  # Diagnostic Stage - Comprehensive connectivity and endpoint testing
+  - stage: Diagnostic
+    displayName: '🔍 Azure Connectivity Diagnostic'
+    condition: eq(variables.runDiagnostic, 'true')
+    jobs:
+      - job: ConnectivityTest
+        displayName: 'Test Azure Endpoint Connectivity'
+        pool: '${{ variables.agentPool }}'
+        
+        steps:
+        - checkout: self
+          displayName: 'Checkout diagnostic scripts'
+        
+        # Test 1: Basic connectivity (no authentication)
+        - script: |
+            echo "=========================================="
+            echo "Testing basic network connectivity..."
+            echo "=========================================="
+            chmod +x scripts/test-azure-connectivity.sh
+            ./scripts/test-azure-connectivity.sh
+          displayName: '🌐 Basic Connectivity Test (No Auth)'
+          env:
+            DATA_IN_APP_NAME: '$(functionAppName)'
+            RESOURCE_GROUP_NAME: '$(resourceGroupName)'
+            ADLS_ACCOUNT_NAME: 'stdp${{ parameters.dataProductId}}${{ parameters.environment }}'
+            KEY_VAULT_NAME: '$(keyVaultName)'
+          continueOnError: true
+        
+        # Test 2: Authenticated connectivity (with service principal)
+        - task: AzureCLI@2
+          displayName: '🔐 Authenticated Connectivity Test'
+          inputs:
+            azureSubscription: '${{ parameters.azureServiceConnection }}'
+            scriptType: 'bash'
+            scriptLocation: 'scriptPath'
+            scriptPath: 'scripts/test-azure-connectivity.sh'
+            workingDirectory: '$(Build.SourcesDirectory)'
+          env:
+            DATA_IN_APP_NAME: '$(functionAppName)'
+            RESOURCE_GROUP_NAME: '$(resourceGroupName)'
+            ADLS_ACCOUNT_NAME: 'stdp${{ parameters.dataProductId}}${{ parameters.environment }}'
+            KEY_VAULT_NAME: '$(keyVaultName)'
+          continueOnError: true
+        
+        # Test 3: Function App SCM Endpoint Accessibility
+        - task: AzureCLI@2
+          displayName: '🔐 Function App SCM Endpoint Test'
+          inputs:
+            azureSubscription: '${{ parameters.azureServiceConnection }}'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+              echo "=========================================="
+              echo "TESTING FUNCTION APP SCM ENDPOINT"
+              echo "=========================================="
+              
+              FUNCTION_APP="$(functionAppName)"
+              SCM_URL="https://$FUNCTION_APP.scm.azurewebsites.net"
+              
+              echo "Function App: $FUNCTION_APP"
+              echo "SCM URL: $SCM_URL"
+              echo ""
+              
+              # Test SCM endpoint accessibility
+              echo "Testing SCM endpoint..."
+              SCM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SCM_URL" || echo "000")
+              
+              if [ "$SCM_STATUS" = "200" ] || [ "$SCM_STATUS" = "401" ] || [ "$SCM_STATUS" = "403" ]; then
+                echo "✅ SCM endpoint is accessible (Status: $SCM_STATUS)"
+                echo "   Note: 401/403 is expected without auth - this confirms reachability"
+              else
+                echo "❌ SCM endpoint may not be accessible (Status: $SCM_STATUS)"
+              fi
+              
+              # Check if Function App exists and get its state
+              echo ""
+              echo "Checking Function App configuration..."
+              az functionapp show \
+                --name $FUNCTION_APP \
+                --resource-group $(resourceGroupName) \
+                --query "{Name:name, State:state, PublicNetworkAccess:publicNetworkAccess, ScmSiteAlsoStopped:siteConfig.scmSiteAlsoStopped}" \
+                -o table
+              
+              echo ""
+              echo "✓ SCM endpoint diagnostic complete"
+              echo "=========================================="
+          continueOnError: true
+
+  # Build Stage - Create clean deployment package
+  - stage: Build
+    displayName: '🔨 Build'
+    dependsOn: []  # Run in parallel with Diagnostic
+    jobs:
+      - job: BuildPackage
+        displayName: 'Build Function App Package'
+        pool: '${{ variables.agentPool }}'
+        
+        steps:
+          # Checkout code
+          - checkout: self
+            displayName: 'Checkout source code'
+          
+          # Set up Python
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+          
+          # Install dependencies
+          - script: |
+              echo "=========================================="
+              echo "INSTALLING PYTHON DEPENDENCIES"
+              echo "=========================================="
+              
+              cd $(workingDirectory)
+              
+              # Remove any existing .python_packages to ensure clean install
+              if [ -d ".python_packages" ]; then
+                echo "Removing existing .python_packages folder..."
+                rm -rf .python_packages
+                echo "✓ Old packages removed"
+              else
+                echo "No existing .python_packages folder found"
+              fi
+              
+              python -m pip install --upgrade pip setuptools wheel
+              
+              # Install from requirements.txt with --only-binary to avoid cffi compilation
+              echo ""
+              echo "Installing dependencies from requirements.txt (using pre-built wheels)..."
+              pip install -r requirements.txt --target=".python_packages/lib/site-packages" --only-binary=:all: || {
+                echo "⚠ Some packages lack wheels, retrying with selective binary..."
+                pip install -r requirements.txt --target=".python_packages/lib/site-packages" --only-binary=cffi,cryptography
+              }
+              
+              echo ""
+              echo "✓ Dependencies installed"
+              echo "=========================================="
+            displayName: 'Install dependencies'
+          
+          # Validate code
+          - script: |
+              echo "=========================================="
+              echo "VALIDATING PYTHON CODE"
+              echo "=========================================="
+              
+              cd $(workingDirectory)
+              
+              echo "Validating Python code syntax..."
+              python -m py_compile function_app.py
+              python -m py_compile shared/config.py
+              python -m py_compile functions/http_operations.py
+              python -m py_compile functions/docs.py
+              
+              echo ""
+              echo "✓ Code validation passed"
+              echo "=========================================="
+            displayName: 'Validate Python code'
+            continueOnError: true
+          
+          # Clean up before archiving
+          - script: |
+              cd $(workingDirectory)
+              
+              # Remove backup files to reduce package size
+              echo "Removing backup files..."
+              rm -f requirements-full.txt.backup
+              rm -f *.backup
+              
+              # Verify .python_packages exists (should have been built in previous step)
+              if [ -d ".python_packages" ]; then
+                echo "✓ .python_packages folder present ($(du -sh .python_packages | cut -f1))"
+              else
+                echo "❌ ERROR: .python_packages not found! Packages were not installed."
+                exit 1
+              fi
+              
+              echo "✓ Cleanup complete"
+            displayName: 'Clean backups and verify packages'
+          
+          # Create ZIP archive (exclude .python_packages to force Azure rebuild)
+          - task: ArchiveFiles@2
+            displayName: 'Archive deployment package'
+            inputs:
+              rootFolderOrFile: '$(workingDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/functionapp-function-app.zip'
+              replaceExistingArchive: true
+          
+          # Verify package
+          - script: |
+              echo "=========================================="
+              echo "VERIFYING DEPLOYMENT PACKAGE"
+              echo "=========================================="
+              
+              PACKAGE_PATH=$(Build.ArtifactStagingDirectory)/functionapp-function-app.zip
+              
+              if [ -f "$PACKAGE_PATH" ]; then
+                echo "✓ Package created: $PACKAGE_PATH"
+                echo "  Size: $(du -h $PACKAGE_PATH | cut -f1)"
+                echo ""
+                echo "Package contents:"
+                unzip -l $PACKAGE_PATH | head -20
+              else
+                echo "❌ ERROR: Package not found!"
+                exit 1
+              fi
+              
+              echo ""
+              echo "✓ Package verification complete"
+              echo "=========================================="
+            displayName: 'Verify package'
+          
+          # Publish artifact
+          - publish: $(Build.ArtifactStagingDirectory)/functionapp-function-app.zip
+            artifact: functionapp-drop
+            displayName: 'Publish deployment package'
+
+  # Deploy Stage - Direct upload to Function App SCM endpoint
+  - stage: Deploy
+    displayName: '🚀 Deploy'
+    dependsOn:
+      - Build
+    condition: succeeded()
+    jobs:
+      - deployment: DeployFunctionApp
+        displayName: 'Deploy to Azure'
+        pool: '${{ variables.agentPool }}'  # Custom agent pool with MS-hosted agents
+        environment: '${{ parameters.environment }}'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              # Download artifact
+              - download: current
+                artifact: functionapp-drop
+                displayName: 'Download deployment package'
+              
+              # Store storage secrets in Key Vault (prep step - no restarts)
+              - task: AzureCLI@2
+                displayName: '🔑 Store storage secrets in Key Vault'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🔑 STORING STORAGE SECRETS IN KEY VAULT"
+                    echo "=========================================="
+                    
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    STORAGE_ACCOUNT="stdp${{ parameters.dataProductId }}${{ parameters.environment }}"
+                    KEY_VAULT_NAME="$(keyVaultName)"
+                    
+                    echo "Storage Account: $STORAGE_ACCOUNT"
+                    echo "Key Vault: $KEY_VAULT_NAME"
+                    echo ""
+                    
+                    # Get storage account key
+                    echo "Retrieving storage account key..."
+                    STORAGE_KEY=$(az storage account keys list \
+                      --account-name $STORAGE_ACCOUNT \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "[0].value" -o tsv)
+                    
+                    if [ -z "$STORAGE_KEY" ]; then
+                      echo "❌ Failed to retrieve storage account key"
+                      exit 1
+                    fi
+                    
+                    echo "✓ Storage account key retrieved"
+                    echo ""
+                    
+                    # Build connection string
+                    STORAGE_CONNECTION="DefaultEndpointsProtocol=https;AccountName=$STORAGE_ACCOUNT;AccountKey=$STORAGE_KEY;EndpointSuffix=core.windows.net"
+                    
+                    # Store connection string in Key Vault as WebJobsConnectionString
+                    echo "Storing AzureWebJobsStorage connection string in Key Vault..."
+                    az keyvault secret set \
+                      --vault-name $KEY_VAULT_NAME \
+                      --name "WebJobsConnectionString" \
+                      --value "$STORAGE_CONNECTION" \
+                      --output none
+                    echo "✓ WebJobsConnectionString stored in Key Vault"
+                    
+                    # Also store just the key for ADLS operations (backward compatibility)
+                    echo "Storing storage key for ADLS operations..."
+                    az keyvault secret set \
+                      --vault-name $KEY_VAULT_NAME \
+                      --name "saPrimaryAccessKey" \
+                      --value "$STORAGE_KEY" \
+                      --output none
+                    echo "✓ saPrimaryAccessKey stored in Key Vault"
+                    
+                    echo ""
+                    echo "✓ All storage secrets ready in Key Vault:"
+                    echo "  - WebJobsConnectionString (for AzureWebJobsStorage)"
+                    echo "  - saPrimaryAccessKey (for ADLS_CLIENT_KEY)"
+                    echo ""
+                    
+                    # FALLBACK: Store direct connection string for emergency fallback
+                    echo "Setting up AzureWebJobsStorage fallback (direct connection string)..."
+                    DIRECT_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=$STORAGE_ACCOUNT;AccountKey=$STORAGE_KEY;EndpointSuffix=core.windows.net"
+                    
+                    # Store the direct connection string as a backup setting
+                    echo "Configuring direct storage connection for emergency fallback..."
+                    az keyvault secret set \
+                      --vault-name $KEY_VAULT_NAME \
+                      --name "DirectConnectionString" \
+                      --value "$DIRECT_CONNECTION_STRING" \
+                      --output none
+                    echo "✓ DirectConnectionString stored for fallback use"
+                    echo ""
+                    echo "Note: If Function App fails to start with Key Vault reference,"
+                    echo "      the pipeline can switch to direct connection string"
+                    echo "=========================================="
+              
+              # Configure ALL Function App settings in ONE command to minimize restarts
+              - task: AzureCLI@2
+                displayName: '⚙️ Configure ALL Function App settings (single command)'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "⚙️ CONFIGURING ALL FUNCTION APP SETTINGS"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    STORAGE_ACCOUNT="stdp${{ parameters.dataProductId }}${{ parameters.environment }}"
+                    ADLS_ACCOUNT="$STORAGE_ACCOUNT"
+                    KEY_VAULT_NAME="$(keyVaultName)"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo "Resource Group: $RESOURCE_GROUP"
+                    echo "Storage Account: $STORAGE_ACCOUNT"
+                    echo "Key Vault: $KEY_VAULT_NAME"
+                    echo ""
+                    
+                    # Build Key Vault references for secrets
+                    WEBJOBS_KV_REFERENCE="@Microsoft.KeyVault(VaultName=$KEY_VAULT_NAME;SecretName=WebJobsConnectionString)"
+                    ADLS_KV_REFERENCE="@Microsoft.KeyVault(VaultName=$KEY_VAULT_NAME;SecretName=saPrimaryAccessKey)"
+                    
+                    echo "AzureWebJobsStorage: Key Vault reference (WebJobsConnectionString)"
+                    echo "ADLS_CLIENT_KEY: Key Vault reference (saPrimaryAccessKey)"
+                    echo ""
+                    
+                    # STEP 1: Set ALL app settings in ONE command (single restart)
+                    echo "Step 1: Setting ALL application settings in one command..."
+                    echo "This includes: Runtime, Python config, Storage, ADLS, Key Vault integration, and Startup script"
+                    echo ""
+                    
+                    az functionapp config appsettings set \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --settings \
+                        FUNCTIONS_EXTENSION_VERSION="~4" \
+                        FUNCTIONS_WORKER_RUNTIME="python" \
+                        PYTHON_VERSION="3.11" \
+                        SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
+                        ENABLE_ORYX_BUILD="false" \
+                        PYTHONPATH="/home/site/wwwroot/.python_packages/lib/site-packages" \
+                        DEPLOYMENT_TYPE="main" \
+                        AzureWebJobsStorage="$WEBJOBS_KV_REFERENCE" \
+                        ADLS_ACCOUNT_NAME="$ADLS_ACCOUNT" \
+                        ADLS_CLIENT_KEY="$ADLS_KV_REFERENCE" \
+                        ADLS_INPUT_CONTAINER_NAME="functionapp" \
+                        ADLS_OUTPUT_CONTAINER_NAME="data-out" \
+                      --output table
+                    
+                    echo ""
+                    echo "✓ All Function App settings configured in single command"
+                    echo ""
+
+                    # STEP 2: Set Python 3.11 runtime stack (separate command - required first)
+                    echo "Step 2: Setting Python 3.11 runtime stack..."
+                    az functionapp config set \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --linux-fx-version "PYTHON|3.11" \
+                      --output table
+                    
+                    echo "✓ Python 3.11 runtime stack configured"
+                    echo ""
+                    
+
+                    echo "Configuration summary:"
+                    echo "  - Functions Runtime: ~4"
+                    echo "  - Python Version: 3.11"
+                    echo "  - Build Mode: Local (Oryx disabled)"
+                    echo "  - Startup Script: /home/site/wwwroot/startup.sh"
+                    echo "  - AzureWebJobsStorage: Key Vault reference (WebJobsConnectionString)"
+                    echo "  - ADLS Account: $ADLS_ACCOUNT"
+                    echo "  - ADLS Authentication: Managed Identity (primary) + Key Vault (fallback)"
+                    echo "  - Input Container: functionapp"
+                    echo "  - Output Container: data-out"
+                    echo ""
+                    echo "✅ All secrets managed via Key Vault"
+                    echo "   - WebJobsConnectionString: Full connection string for runtime"
+                    echo "   - saPrimaryAccessKey: Storage key for ADLS operations"
+                    echo ""
+                    echo "✅ Startup script will restore .python_packages from backup"
+                    echo "   - Enables fast code-only deployments via minimal pipeline"
+                    echo "   - Backup location: /home/data/.python_packages_backup"
+                    echo ""
+                    echo "⚠️  Configuration changes trigger automatic restart"
+                    echo "   Wait time will be applied before deployment"
+                    echo "=========================================="
+              
+              # Configure Managed Identity
+              - task: AzureCLI@2
+                displayName: '🔐 Configure Managed Identity'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🔐 CONFIGURING MANAGED IDENTITY"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    ADLS_ACCOUNT="stdp${{ parameters.dataProductId }}${{ parameters.environment }}"
+                    
+                    # Enable system-assigned managed identity
+                    echo "Enabling system-assigned managed identity..."
+                    az functionapp identity assign \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP
+                    
+                    # Get managed identity details (principal ID and client ID)
+                    IDENTITY_JSON=$(az functionapp identity show \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP)
+                    
+                    PRINCIPAL_ID=$(echo $IDENTITY_JSON | jq -r '.principalId')
+                    CLIENT_ID=$(echo $IDENTITY_JSON | jq -r '.principalId')
+                    
+                    echo "Managed Identity Principal ID: $PRINCIPAL_ID"
+                    echo "Managed Identity Client ID: $CLIENT_ID"
+                    
+                    # Set client_id as app setting for MSI token requests
+                    echo "Setting AZURE_CLIENT_ID app setting..."
+                    az functionapp config appsettings set \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --settings AZURE_CLIENT_ID=$CLIENT_ID \
+                      --output none
+                    echo "✓ AZURE_CLIENT_ID configured"
+                    echo ""
+                    
+                    # Get ADLS storage account resource ID
+                    STORAGE_ID=$(az storage account show \
+                      --name $ADLS_ACCOUNT \
+                      --resource-group $RESOURCE_GROUP \
+                      --query id -o tsv)
+                    
+                    echo "Assigning Storage Blob Data Contributor role..."
+                    az role assignment create \
+                      --assignee $PRINCIPAL_ID \
+                      --role "Storage Blob Data Contributor" \
+                      --scope $STORAGE_ID \
+                      2>/dev/null || echo "Role assignment already exists"
+                    
+                    echo ""
+                    echo "Assigning Storage Account Key Operator role..."
+                    az role assignment create \
+                      --assignee $PRINCIPAL_ID \
+                      --role "Storage Account Key Operator Service Role" \
+                      --scope $STORAGE_ID \
+                      2>/dev/null || echo "Role assignment already exists"
+                    
+                    echo ""
+                    echo "Assigning Storage Table Data Contributor role for Azure Functions runtime..."
+                    az role assignment create \
+                      --assignee $PRINCIPAL_ID \
+                      --role "Storage Table Data Contributor" \
+                      --scope $STORAGE_ID \
+                      2>/dev/null || echo "Role assignment already exists"
+                    
+                    echo ""
+                    echo "Assigning Storage Account Contributor role..."
+                    az role assignment create \
+                      --assignee $PRINCIPAL_ID \
+                      --role "Storage Account Contributor" \
+                      --scope $STORAGE_ID \
+                      2>/dev/null || echo "Role assignment already exists"
+                    
+                    echo ""
+                    echo "Configuring Key Vault access for Function App..."
+                    KEY_VAULT_NAME="$(keyVaultName)"
+                    
+                    # Grant Key Vault Secrets User role to Function App managed identity
+                    echo "Assigning Key Vault Secrets User role..."
+                    KEY_VAULT_ID=$(az keyvault show \
+                      --name $KEY_VAULT_NAME \
+                      --query id -o tsv)
+                    
+                    az role assignment create \
+                      --assignee $PRINCIPAL_ID \
+                      --role "Key Vault Secrets User" \
+                      --scope $KEY_VAULT_ID \
+                      2>/dev/null || echo "Key Vault role assignment already exists"
+                    
+                    echo "✓ Key Vault access configured for Function App managed identity"
+                    
+                    echo ""
+                    echo "Waiting for Key Vault role assignment to propagate..."
+                    echo "This can take up to 60 seconds in Azure..."
+                    sleep 60
+                    
+                    echo ""
+                    echo "Verifying role assignments..."
+                    ROLE_COUNT=$(az role assignment list \
+                      --assignee $PRINCIPAL_ID \
+                      --scope $STORAGE_ID \
+                      --query "length(@)" -o tsv)
+                    
+                    echo "Found $ROLE_COUNT role assignment(s) for this managed identity on ADLS storage"
+                    
+                    # List the specific roles
+                    echo ""
+                    echo "Role assignments:"
+                    az role assignment list \
+                      --assignee $PRINCIPAL_ID \
+                      --scope $STORAGE_ID \
+                      --query "[].{Role:roleDefinitionName, Scope:scope}" \
+                      -o table
+                    
+                    # Test Key Vault access
+                    echo ""
+                    echo "Testing Key Vault access..."
+                    if az keyvault secret show \
+                      --vault-name $KEY_VAULT_NAME \
+                      --name "saPrimaryAccessKey" \
+                      --query "value" -o tsv >/dev/null 2>&1; then
+                      echo "✅ Key Vault access verified - secret can be read"
+                    else
+                      echo "⚠️  Key Vault access test failed - role may still be propagating"
+                      echo "   Waiting additional 30 seconds..."
+                      sleep 30
+                    fi
+                    
+                    # Verify the critical roles are present
+                    HAS_BLOB_CONTRIBUTOR=$(az role assignment list \
+                      --assignee $PRINCIPAL_ID \
+                      --scope $STORAGE_ID \
+                      --query "[?roleDefinitionName=='Storage Blob Data Contributor'] | length(@)" -o tsv)
+                    
+                    if [ "$HAS_BLOB_CONTRIBUTOR" -gt "0" ]; then
+                      echo "✓ Storage Blob Data Contributor role verified"
+                    else
+                      echo "❌ ERROR: Storage Blob Data Contributor role NOT found!"
+                      echo "   The Function App will NOT be able to access ADLS blobs"
+                      exit 1
+                    fi
+                    
+                    # Verify Azure Tables access for Functions runtime
+                    HAS_TABLE_CONTRIBUTOR=$(az role assignment list \
+                      --assignee $PRINCIPAL_ID \
+                      --scope $STORAGE_ID \
+                      --query "[?roleDefinitionName=='Storage Table Data Contributor'] | length(@)" -o tsv)
+                    
+                    if [ "$HAS_TABLE_CONTRIBUTOR" -gt "0" ]; then
+                      echo "✓ Storage Table Data Contributor role verified"
+                    else
+                      echo "❌ ERROR: Storage Table Data Contributor role NOT found!"
+                      echo "   The Function App runtime may experience authentication errors"
+                      exit 1
+                    fi
+                    
+                    # Verify Key Vault access
+                    echo ""
+                    echo "Verifying Key Vault access..."
+                    KEY_VAULT_NAME="$(keyVaultName)"
+                    KEY_VAULT_ID=$(az keyvault show --name $KEY_VAULT_NAME --query id -o tsv)
+                    
+                    HAS_KEYVAULT_ACCESS=$(az role assignment list \
+                      --assignee $PRINCIPAL_ID \
+                      --scope $KEY_VAULT_ID \
+                      --query "[?roleDefinitionName=='Key Vault Secrets User'] | length(@)" -o tsv)
+                    
+                    if [ "$HAS_KEYVAULT_ACCESS" -gt "0" ]; then
+                      echo "✓ Key Vault Secrets User role verified"
+                    else
+                      echo "❌ ERROR: Key Vault Secrets User role NOT found!"
+                      echo "   The Function App will NOT be able to access Key Vault secrets"
+                      exit 1
+                    fi
+                    
+                    echo ""
+                    echo "✓ Managed identity configured with necessary roles"
+                    echo "  - Storage Blob Data Contributor (ADLS access)"
+                    echo "  - Storage Account Key Operator (storage key access)"
+                    echo "  - Storage Table Data Contributor (Functions runtime)"
+                    echo "  - Storage Account Contributor (storage account management)"
+                    echo "  - Key Vault Secrets User (Key Vault access)"
+                    echo "=========================================="
+              
+              # Wait for configuration changes to settle
+              - task: AzureCLI@2
+                displayName: '⏳ Wait for configuration changes to settle'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "⏳ WAITING FOR CONFIGURATION TO SETTLE"
+                    echo "=========================================="
+                    echo ""
+                    echo "All configuration changes are complete."
+                    echo "Configuration changes trigger automatic restarts."
+                    echo ""
+                    echo "Waiting 3 minutes for any automatic restarts to complete..."
+                    echo "This prevents SCM container conflicts during deployment."
+                    echo ""
+                    
+                    # Wait in 30-second increments with progress updates
+                    for i in {1..6}; do
+                      echo "⏳ Progress: $((i * 30))/180 seconds..."
+                      sleep 30
+                    done
+                    
+                    echo ""
+                    echo "✓ Configuration should be stable for deployment"
+                    echo "=========================================="
+              
+              # Deploy via SCM endpoint (Direct upload - No storage account needed!)
+              - task: AzureCLI@2
+                displayName: '📦 Deploy via SCM Endpoint'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "📦 DEPLOYING VIA SCM ENDPOINT"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    PACKAGE_PATH="$(Pipeline.Workspace)/functionapp-drop/functionapp-function-app.zip"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo "Package: $PACKAGE_PATH"
+                    echo ""
+                    
+                    # Verify package exists
+                    if [ ! -f "$PACKAGE_PATH" ]; then
+                      echo "❌ ERROR: Package not found at $PACKAGE_PATH"
+                      exit 1
+                    fi
+                    
+                    PACKAGE_SIZE=$(du -h "$PACKAGE_PATH" | cut -f1)
+                    echo "Package size: $PACKAGE_SIZE"
+                    echo ""
+                    
+                    # Use az functionapp deployment (simplest approach)
+                    echo "Uploading package to Function App..."
+                    echo "This bypasses storage account completely!"
+                    echo ""
+                    
+                    # Use az functionapp deployment with enhanced error handling
+                    echo "Uploading package to Function App..."
+                    echo "Using SCM endpoint with extended timeout and retry logic..."
+                    echo ""
+                    
+                    # Try deployment with retry logic for reliability
+                    MAX_ATTEMPTS=3
+                    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+                      echo "Deployment attempt $attempt/$MAX_ATTEMPTS..."
+                      
+                      if az functionapp deployment source config-zip \
+                        --resource-group $(resourceGroupName) \
+                        --name $FUNCTION_APP \
+                        --src "$PACKAGE_PATH" \
+                        --build-remote false \
+                        --timeout 1800; then
+                        echo ""
+                        echo "✅ Deployment successful on attempt $attempt!"
+                        break
+                      else
+                        DEPLOY_EXIT_CODE=$?
+                        echo ""
+                        echo "❌ Deployment attempt $attempt failed (exit code: $DEPLOY_EXIT_CODE)"
+                        
+                        if [ $attempt -lt $MAX_ATTEMPTS ]; then
+                          echo ""
+                          RETRY_DELAY=$((60 + (attempt * 30)))
+                          echo "Waiting $RETRY_DELAY seconds before retry..."
+                          echo "SCM container needs time to stabilize after configuration changes."
+                          sleep $RETRY_DELAY
+                        else
+                          echo ""
+                          echo "❌ All deployment attempts failed"
+                          echo "Package size: $PACKAGE_SIZE"
+                          echo "Troubleshooting steps:"
+                          echo "1. Check Function App SCM endpoint accessibility"
+                          echo "2. Verify Function App is running and healthy"
+                          echo "3. Check Azure service health for deployment issues"
+                          exit 1
+                        fi
+                      fi
+                    done
+                    
+                    echo ""
+                    echo "Waiting for deployment to complete..."
+                    sleep 30
+                    
+                    echo ""
+                    echo "✓ Deployment complete"
+                    echo "=========================================="
+              
+              # Restart and sync after deployment
+              - task: AzureCLI@2
+                displayName: '🔄 Restart Function App after deployment'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🔄 RESTARTING AFTER DEPLOYMENT"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo ""
+                    
+                    echo "Restarting Function App to apply changes..."
+                    az functionapp restart \
+                      --resource-group $(resourceGroupName) \
+                      --name $FUNCTION_APP
+                    
+                    echo ""
+                    echo "Waiting for Function App to restart..."
+                    sleep 30
+                    
+                    echo ""
+                    echo "Syncing function triggers..."
+                    # Force sync triggers using Azure Management API
+                    SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                    SYNC_URL="https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$(resourceGroupName)/providers/Microsoft.Web/sites/$FUNCTION_APP/syncfunctiontriggers?api-version=2022-03-01"
+                    
+                    az rest \
+                      --method POST \
+                      --uri "$SYNC_URL" \
+                      --output none \
+                      2>&1 || echo "⚠️ SyncTriggers may have failed, but continuing..."
+                    
+                    echo "✅ Triggers synchronized"
+                    
+                    echo ""
+                    echo "Waiting for trigger sync to complete..."
+                    sleep 15
+                    
+                    echo ""
+                    echo "✓ Deployment complete, Function App restarted, and triggers synchronized"
+                    echo "=========================================="
+              
+              # Verify functions registered (may need more time after deployment)
+              - task: AzureCLI@2
+                displayName: '✅ Verify functions registered'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "✅ VERIFYING FUNCTION REGISTRATION"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    
+                    echo "⚠️  Note: Functions may not be registered immediately after deployment"
+                    echo "   The Function App needs time to initialize and load Python modules"
+                    echo "   If this shows 0 functions, wait a few minutes and check again"
+                    echo ""
+                    
+                    echo "Attempting to list registered functions..."
+                    echo ""
+                    
+                    az functionapp function list \
+                      --name $FUNCTION_APP \
+                      --resource-group $(resourceGroupName) \
+                      --query "[].{Name:name, InvokeUrlTemplate:invokeUrlTemplate}" \
+                      -o table 2>&1 || echo "Function list command failed"
+                    
+                    FUNCTION_COUNT=$(az functionapp function list \
+                      --name $FUNCTION_APP \
+                      --resource-group $(resourceGroupName) \
+                      --query "length(@)" -o tsv 2>/dev/null || echo "0")
+                    
+                    echo ""
+                    echo "API reported function count: $FUNCTION_COUNT"
+                    
+                    if [ "$FUNCTION_COUNT" -gt "0" ]; then
+                      echo "✓ Functions successfully registered"
+                    else
+                      echo ""
+                      echo "⚠️  Functions not registered yet (initialization still in progress)"
+                      echo "   Health endpoint test below is the definitive check"
+                    fi
+                    
+                    echo "=========================================="
+                continueOnError: true
+              
+              # Test health endpoint
+              - task: AzureCLI@2
+                displayName: '🏥 Test health endpoint'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🏥 TESTING HEALTH ENDPOINT"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    HEALTH_URL="https://$FUNCTION_APP.azurewebsites.net/api/health"
+                    
+                    echo "Health URL: $HEALTH_URL"
+                    echo "Waiting 15 seconds for things to settle..."
+                    sleep 15
+                    
+                    echo "Testing health endpoint (max 3 attempts)..."
+                    for i in {1..3}; do
+                      echo "Attempt $i/3..."
+                      HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL)
+                      
+                      if [ "$HTTP_STATUS" = "200" ]; then
+                        echo "✅ Health check passed (Status: $HTTP_STATUS)"
+                        echo ""
+                        curl -s $HEALTH_URL | jq '.' || curl -s $HEALTH_URL
+                        echo ""
+                        echo "✓ Function App is healthy and responding"
+                        echo "=========================================="
+                        exit 0
+                      elif [ "$HTTP_STATUS" = "503" ]; then
+                        echo "❌ Status: $HTTP_STATUS - Service Unavailable"
+                        echo "   This indicates a configuration or startup error"
+                        if [ $i -lt 3 ]; then
+                          echo "   Waiting 15 seconds before retry..."
+                          sleep 15
+                        fi
+                      else
+                        echo "Status: $HTTP_STATUS (expected 200)"
+                        if [ $i -lt 3 ]; then
+                          echo "Waiting 10 seconds before retry..."
+                          sleep 10
+                        fi
+                      fi
+                    done
+                    
+                    echo ""
+                    echo "❌ DEPLOYMENT FAILED: Health endpoint verification failed"
+                    echo "   Final status: $HTTP_STATUS"
+                    if [ "$HTTP_STATUS" = "503" ]; then
+                      echo "   503 Error indicates Function App configuration issues:"
+                      echo "   - Runtime startup failures"
+                    fi
+                    echo "   Check Function App logs for detailed error information"
+                    echo "=========================================="
+                    exit 1

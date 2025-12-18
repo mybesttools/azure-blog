@@ -1,0 +1,66 @@
+
+.markdown {
+  @apply text-lg leading-relaxed;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote {
+  @apply my-6;
+}
+
+.markdown ul {
+  padding-left: 2em;
+  list-style-type: disc;
+}
+
+.markdown ol {
+  padding-left: 2em;
+  list-style-type: decimal;
+}
+
+.markdown li {
+  margin-bottom: 0.5em;
+  line-height: 1.7;
+}
+
+.markdown ul li::marker {
+  color: #4299e1;
+  font-size: 1.2em;
+}
+
+.markdown pre {
+  background: #1a202c;
+  color: #f8f8f2;
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin: 1.5em 0;
+  font-size: 1em;
+}
+
+.markdown code {
+  background: #2d3748;
+  color: #f8f8f2;
+  padding: 0.2em 0.4em;
+  border-radius: 0.3em;
+  font-size: 0.95em;
+}
+
+.markdown pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+
+.markdown h2 {
+  @apply text-3xl mt-12 mb-4 leading-snug;
+}
+
+
+.markdown h3 {
+  @apply text-2xl mt-8 mb-4 leading-snug;
+}

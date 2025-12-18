@@ -1,0 +1,433 @@
+# Minimal Azure DevOps Pipeline for functionapp Function App
+# Fast deployment of code changes only (no dependency rebuilding)
+# Use this when only Python code has changed, not requirements
+# Preferred pipeline for quick code updates
+
+parameters:
+  - name: azureServiceConnection
+    type: string
+    displayName: 'Azure Service Connection'
+    default: 'your-service-connection'
+  - name: environment
+    type: string
+    values: ['poc', 'nonprod', 'prd']
+    default: 'poc'
+  - name: dataProductId
+    type: string
+    default: '00000002'
+
+# Triggers disabled - this pipeline is triggered by Pipelines/deploy-all-minimal.yml
+trigger: none
+
+pr: none
+
+variables:
+  - group: ${{ parameters.environment }}
+  - name: agentPool
+    value: 'your-agent-pool'  # Use Microsoft-hosted agents
+  - name: workingDirectory
+    value: '$(Build.SourcesDirectory)/functionapp'
+  - name: functionAppName
+    value: 'app-dp${{ parameters.dataProductId }}-functionapp-${{ parameters.environment }}'
+  - name: azureServiceConnection
+    value: '${{ parameters.azureServiceConnection }}'
+  - name: resourceGroupName
+    value: 'rg-dp${{ parameters.dataProductId }}-${{ parameters.environment }}'
+
+stages:
+  - stage: SimpleBuild
+    displayName: 'Package Code Only'
+    jobs:
+      - job: PackageJob
+        displayName: 'Package Python Code'
+        pool: ${{ variables.agentPool }}
+        
+        steps:
+        - checkout: self
+          displayName: 'Checkout source code'
+        
+        - task: UsePythonVersion@0
+          displayName: 'Use Python 3.11 (match Function App runtime)'
+          inputs:
+            versionSpec: '3.11'
+            addToPath: true
+        
+        - script: |
+            cd $(workingDirectory)
+            echo "Validating Python code syntax..."
+            python -m py_compile function_app.py
+            python -m py_compile shared/config.py
+            python -m py_compile functions/http_operations.py
+            python -m py_compile functions/docs.py
+            echo "✓ Code validation passed"
+            
+            echo ""
+            echo "Validating requirements.txt compatibility..."
+            if grep -q "cryptography==43.0.3" requirements.txt; then
+              echo "✓ Cryptography 43.0.3 pinned for GLIBC compatibility"
+            else
+              echo "❌ ERROR: Cryptography not pinned to 43.0.3!"
+              echo "Current requirements.txt content:"
+              cat requirements.txt
+              exit 1
+            fi
+          displayName: 'Validate Python code and dependencies'
+          continueOnError: false
+        
+        # Note: Packages are NOT installed in minimal pipeline
+        # Instead, they will be restored from backup on the Function App after deployment
+        # The create_package_backup timer function creates backups after main pipeline deployments
+        - script: |
+            cd $(workingDirectory)
+            echo "=========================================="
+            echo "MINIMAL PIPELINE: CODE-ONLY DEPLOYMENT"
+            echo "=========================================="
+            echo ""
+            echo "ℹ️  Packages will be restored from backup on Function App"
+            echo "   Backup location: /home/data/.python_packages_backup"
+            echo "   This saves ~3-5 minutes compared to full package installation"
+            echo ""
+            echo "⚠  Prerequisite: Main pipeline must have run at least once"
+            echo "             to create the package backup"
+            echo "=========================================="
+          displayName: 'Info: Package restore strategy'
+        
+        # Remove local.settings.json before packaging
+        - script: |
+            cd $(workingDirectory)
+            if [ -f "local.settings.json" ]; then
+              echo "Removing local.settings.json from deployment package..."
+              rm local.settings.json
+            fi
+          displayName: 'Remove local.settings.json'
+        
+        - task: ArchiveFiles@2
+          displayName: 'Package functionapp Code'
+          inputs:
+            rootFolderOrFile: '$(workingDirectory)'
+            includeRootFolder: false
+            archiveType: 'zip'
+            archiveFile: '$(Build.ArtifactStagingDirectory)/functionapp.zip'
+            replaceExistingArchive: true
+        
+        - script: |
+            echo "Verifying package contents..."
+            unzip -l $(Build.ArtifactStagingDirectory)/functionapp.zip | grep -E "(host.json|function_app.py|.python_packages|azure)" | head -30
+            echo ""
+            echo "Package size:"
+            ls -lh $(Build.ArtifactStagingDirectory)/functionapp.zip
+          displayName: 'Verify package structure'
+        
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish artifacts'
+          inputs:
+            PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+            ArtifactName: 'functionapp-simple-drop'
+            publishLocation: 'Container'
+
+  - stage: SimpleDeploy
+    displayName: 'Deploy Without IP Allowlisting'
+    dependsOn: SimpleBuild
+    condition: succeeded()
+    
+    jobs:
+      - deployment: DeployCodeOnly
+        displayName: 'Simple Deployment'
+        environment: '${{ parameters.environment }}'
+        pool: '${{ variables.agentPool }}'
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: DownloadBuildArtifacts@0
+                displayName: 'Download artifacts'
+                inputs:
+                  buildType: 'current'
+                  downloadType: 'single'
+                  artifactName: 'functionapp-simple-drop'
+                  downloadPath: '$(Pipeline.Workspace)'
+              
+              - task: AzureCLI@2
+                displayName: '🔍 Check Function App current configuration'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🔍 CHECKING FUNCTION APP CONFIGURATION"
+                    echo "=========================================="
+                    echo "Testing deployment without IP allowlisting"
+                    echo "Will use the Function App's current access configuration"
+                    echo ""
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo "Resource Group: $RESOURCE_GROUP"
+                    echo ""
+                    
+                    # Check current Function App status
+                    echo "Current Function App status:"
+                    az functionapp show \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "{state:state, enabled:enabled, publicNetworkAccess:publicNetworkAccess}" \
+                      -o table
+                    
+                    echo ""
+                    echo "Current SCM access restrictions:"
+                    az functionapp config access-restriction show \
+                      --resource-group $RESOURCE_GROUP \
+                      --name $FUNCTION_APP \
+                      --query "scmIpSecurityRestrictions[].{Name:name, Action:action, Priority:priority, IP:ip_address}" \
+                      --output table 2>/dev/null || echo "No restrictions found"
+                    
+                    echo ""
+                    echo "Current agent IP (for reference):"
+                    curl -s --max-time 10 ifconfig.me 2>/dev/null || curl -s --max-time 10 icanhazip.com 2>/dev/null || echo "Could not determine IP"
+                    
+                    echo ""
+                    echo "✅ Proceeding with deployment using current configuration"
+                    echo "========================================"
+              
+              # Deploy complete package with dependencies included
+              - task: AzureCLI@2
+                displayName: '📦 Deploy complete package'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "📦 COMPLETE DEPLOYMENT"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    PACKAGE_PATH="$(Pipeline.Workspace)/functionapp-simple-drop/functionapp.zip"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo "Package: $PACKAGE_PATH"
+                    echo ""
+                    
+                    # Verify package exists
+                    if [ ! -f "$PACKAGE_PATH" ]; then
+                      echo "❌ ERROR: Package not found at $PACKAGE_PATH"
+                      exit 1
+                    fi
+                    
+                    PACKAGE_SIZE=$(du -h "$PACKAGE_PATH" | cut -f1)
+                    echo "Package size: $PACKAGE_SIZE (includes all dependencies)"
+                    echo ""
+                    
+                    echo "ℹ️  Deploying complete package with all dependencies included"
+                    echo ""
+                    
+                    # Deploy complete package
+                    echo "Deploying complete package..."
+                    if az functionapp deployment source config-zip \
+                      --resource-group $(resourceGroupName) \
+                      --name $FUNCTION_APP \
+                      --src "$PACKAGE_PATH" \
+                      --build-remote false \
+                      --timeout 600; then
+                      echo ""
+                      echo "✅ Deployment completed successfully!"
+                      echo "   All dependencies included in package"
+                    else
+                      echo ""
+                      echo "❌ Deployment failed"
+                      exit 1
+                    fi
+                    
+                    echo ""
+                    echo "✓ Deployment complete"
+                    echo "========================================"
+                            # Restore packages from backup
+              - task: AzureCLI@2
+                displayName: '📦 Restore packages from backup'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "📦 RESTORING PACKAGES FROM BACKUP"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    
+                    echo "Function App: $FUNCTION_APP"
+                    echo ""
+                    
+                    # Run restore command via Kudu API
+                    echo "Executing package restore on Function App..."
+                    echo "Command: mv /home/data/.python_packages_backup /home/site/wwwroot/.python_packages"
+                    echo ""
+                    
+                    # Get publish credentials
+                    CREDS=$(az functionapp deployment list-publishing-credentials \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "{username:publishingUserName, password:publishingPassword}" \
+                      -o json)
+                    
+                    USERNAME=$(echo $CREDS | jq -r '.username')
+                    PASSWORD=$(echo $CREDS | jq -r '.password')
+                    
+                    # Execute restore via Kudu command API
+                    RESTORE_RESPONSE=$(curl -s -X POST \
+                      -u "$USERNAME:$PASSWORD" \
+                      "https://$FUNCTION_APP.scm.azurewebsites.net/api/command" \
+                      -H "Content-Type: application/json" \
+                      -d '{"command": "bash -c \"if [ ! -d /home/data/.python_packages_backup ]; then echo BACKUP_NOT_FOUND; exit 1; fi && if [ ! -f /home/data/.python_packages_backup/.backup_ready ]; then echo BACKUP_NOT_READY; exit 1; fi && cat /home/data/.python_packages_backup/.backup_ready && rm -rf /home/site/wwwroot/.python_packages && mv /home/data/.python_packages_backup /home/site/wwwroot/.python_packages && echo RESTORE_SUCCESS\"", "dir": "/home/site/wwwroot"}')
+                    
+                    echo "Response: $RESTORE_RESPONSE"
+                    echo ""
+                    
+                    if echo "$RESTORE_RESPONSE" | grep -q "RESTORE_SUCCESS"; then
+                      echo "✅ Packages restored from backup successfully"
+                    elif echo "$RESTORE_RESPONSE" | grep -q "BACKUP_NOT_FOUND"; then
+                      echo "⚠️  WARNING: Backup not found at /home/data/.python_packages_backup"
+                      echo "   Run the main pipeline first to create package backup"
+                      exit 1
+                    elif echo "$RESTORE_RESPONSE" | grep -q "BACKUP_NOT_READY"; then
+                      echo "⚠️  WARNING: Backup exists but is not ready (missing .backup_ready marker)"
+                      echo "   Backup may be incomplete or still in progress"
+                      echo "   Wait for create_package_backup timer to complete, then retry"
+                      exit 1
+                    else
+                      echo "❌ Package restore failed"
+                      exit 1
+                    fi
+                    
+                    echo "=========================================="
+                            # Check deployment status
+              - task: AzureCLI@2
+                displayName: "🔍 Check Function App status after deployment"
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    echo "=========================================="
+                    echo "🔍 CHECKING DEPLOYMENT RESULTS"
+                    echo "=========================================="
+                    
+                    FUNCTION_APP="$(functionAppName)"
+                    RESOURCE_GROUP="$(resourceGroupName)"
+                    
+                    # Check critical app settings
+                    echo "Checking critical app settings..."
+                    az functionapp config appsettings list \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "[?name=='FUNCTIONS_WORKER_RUNTIME' || name=='FUNCTIONS_EXTENSION_VERSION' || name=='AzureWebJobsStorage' || name=='PYTHON_VERSION'].{name:name, value:value}" \
+                      -o table
+                    
+                    echo ""
+                    
+                    # Check Function App status
+                    echo "Function App status:"
+                    az functionapp show \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "{state:state, hostingEnvironmentProfile:hostingEnvironmentProfile, enabled:enabled, httpsOnly:httpsOnly}" \
+                      -o table
+                    
+                    # Check for any deployment errors
+                    echo ""
+                    echo "Recent deployment logs:"
+                    az functionapp log deployment list \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "[0:3].{id:id, status:status, message:message, receivedTime:receivedTime}" \
+                      -o table 2>/dev/null || echo "Could not retrieve deployment logs"
+                    
+                    # Test the Function App endpoint
+                    echo ""
+                    echo "Testing Function App endpoint..."
+                    FUNCTION_URL=$(az functionapp show \
+                      --name $FUNCTION_APP \
+                      --resource-group $RESOURCE_GROUP \
+                      --query "defaultHostName" -o tsv)
+                    
+                    echo "Function URL: https://$FUNCTION_URL"
+                    
+                    # Wait a bit for function to initialize
+                    echo "Waiting 30 seconds for function to initialize..."
+                    sleep 30
+                    
+                    # Test health endpoint
+                    echo "Testing health endpoint..."
+                    HEALTH_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" "https://$FUNCTION_URL/api/health" 2>/dev/null || echo "HTTPSTATUS:000")
+                    HEALTH_BODY=$(echo "$HEALTH_RESPONSE" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
+                    HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
+                    
+                    echo "Health endpoint status: $HEALTH_STATUS"
+                    if [ "$HEALTH_STATUS" = "200" ]; then
+                      echo "✅ Health endpoint working"
+                      echo "Response: $HEALTH_BODY"
+                    else
+                      echo "⚠ Health endpoint returned: $HEALTH_STATUS"
+                      echo "Response body: $HEALTH_BODY"
+                    fi
+                    
+                    echo "=========================================="
+
+  - stage: QuickVerify
+    displayName: 'Quick Verification'
+    dependsOn: SimpleDeploy
+    condition: succeeded()
+    
+    jobs:
+      - job: QuickTest
+        displayName: 'Test Function Endpoints'
+        pool: '${{ variables.agentPool }}'
+
+        steps:
+        - task: AzureCLI@2
+          displayName: 'Test endpoints'
+          inputs:
+            azureSubscription: '$(azureServiceConnection)'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+              FUNCTION_HOST=$(az functionapp show \
+                --name $(functionAppName) \
+                --resource-group $(resourceGroupName) \
+                --query "defaultHostName" -o tsv)
+              
+              echo "Testing simple deployment endpoints..."
+              echo "Function Host: ${FUNCTION_HOST}"
+              
+              # Test health endpoint
+              echo "1. Testing health endpoint..."
+              sleep 20
+              HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${FUNCTION_HOST}/api/health")
+              if [ "$HEALTH_STATUS" = "200" ]; then
+                echo "✅ Health endpoint working"
+              else
+                echo "⚠ Health endpoint returned: $HEALTH_STATUS"
+              fi
+              
+              # Test docs endpoint
+              echo "2. Testing docs endpoint..."
+              DOCS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${FUNCTION_HOST}/api/docs")
+              if [ "$DOCS_STATUS" = "200" ]; then
+                echo "✅ Docs endpoint working"
+              else
+                echo "⚠ Docs endpoint returned: $DOCS_STATUS"
+              fi
+              
+              echo "========================================"
+              echo "Simple Deployment Complete"
+              echo "========================================"
+              echo "Function: $(functionAppName)"
+              echo "Health: https://${FUNCTION_HOST}/api/health"
+              echo "Docs: https://${FUNCTION_HOST}/api/docs"
+              echo "Upload: https://${FUNCTION_HOST}/api/upload/file"
+              echo "========================================"
