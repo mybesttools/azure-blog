@@ -1,0 +1,19 @@
+# Minimal Azure Functions dependencies for fast startup
+# This file contains only essential dependencies for basic function operation
+
+# Core Azure Functions (essential)
+azure-functions>=1.24.0,<2.0.0
+
+# Basic Azure integration (essential)
+azure-identity==1.19.0
+azure-storage-blob==12.23.1
+
+# Cryptography pinned to avoid GLIBC 2.33 issue (per Microsoft guidance)
+# See: https://github.com/Azure/azure-sdk-for-python/issues/38725
+# Needed for secure connections and authentication to blob storage
+cryptography==43.0.3
+cffi==1.17.1  # Pinned version for _cffi_backend compatibility
+
+# HTTP and utilities (essential)
+requests==2.32.3
+python-dotenv==1.0.1
