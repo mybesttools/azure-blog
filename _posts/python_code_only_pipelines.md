@@ -312,7 +312,7 @@ This pattern has transformed our development workflow, enabling rapid iteration 
 
 Full implementation available in our [GitHub repository](https://github.com/mybesttools/azure-blog), including:
 
-- Timer function code (`/sourcecode/codeonly/functions/maintenance_operations.py`)
+- Timer function code (`/public/sourcecode/codeonly/functions/maintenance_operations.py`)
 - Main pipeline (`/public/sourcecode/codeonly/azure-pipelines.yml`)
 - Minimal pipeline (`/public/sourcecode/codeonly/azure-pipelines-minimal.yml`)
 - Host configuration (`/public/sourcecode/codeonly/host.json`)
