@@ -319,4 +319,4 @@ Full implementation available in our [GitHub repository](https://github.com/mybe
 
 ---
 
-**Questions or improvements?** Share your experiences with Azure Functions CI/CD optimization in the comments of our [GitHub repository](https://github.com/mybesttools/azure-blog)!
+**Questions or improvements?** Share your experiences with Azure Functions CI/CD optimization in the comments section below powered by GitHub Discussions. You can also open an [issue](https://github.com/mybesttools/azure-blog/issues) or [discussion](https://github.com/mybesttools/azure-blog/discussions) directly on our GitHub repository!

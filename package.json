@@ -5,10 +5,10 @@
     "build": "next build",
     "start": "next start"
   },
-  "dependencies": 
-  {
+  "dependencies": {
     "classnames": "^2.5.1",
     "date-fns": "^3.6.0",
+    "giscus": "^1.6.0",
     "gray-matter": "^4.0.3",
     "next": "15.0.2",
     "react": "19.0.0-rc-02c0e824-20241028",
@@ -26,4 +26,3 @@
     "typescript": "^5.5.2"
   }
 }
-
