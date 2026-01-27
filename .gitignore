@@ -58,6 +58,11 @@ typings/
 .next/
 #public
 
+# Payload CMS
+payload-types.ts
+generated-schema.graphql
+public/media/
+
 # Mac files
 .DS_Store
 

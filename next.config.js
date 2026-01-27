@@ -1,9 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.azurewebsites.net',
+      },
+    ],
   },
-  output: 'export',
+  output: 'standalone',
 };
 
 module.exports = nextConfig;

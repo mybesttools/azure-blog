@@ -1,28 +1,117 @@
 import { Post } from "@/interfaces/post";
-import fs from "fs";
-import matter from "gray-matter";
-import { join } from "path";
+import { getPayloadClient } from "@/payload/getPayloadClient";
+import { serialize } from '@payloadcms/richtext-slate/dist/serialize';
 
-const postsDirectory = join(process.cwd(), "_posts");
-
-export function getPostSlugs() {
-  return fs.readdirSync(postsDirectory);
+export async function getPostSlugs() {
+  const payload = await getPayloadClient();
+  const { docs } = await payload.find({
+    collection: 'posts',
+    where: {
+      status: {
+        equals: 'published',
+      },
+    },
+    limit: 1000,
+  });
+  return docs.map((post) => post.slug);
 }
 
-export function getPostBySlug(slug: string) {
-  const realSlug = slug.replace(/\.md$/, "");
-  const fullPath = join(postsDirectory, `${realSlug}.md`);
-  const fileContents = fs.readFileSync(fullPath, "utf8");
-  const { data, content } = matter(fileContents);
+export async function getPostBySlug(slug: string): Promise<Post | null> {
+  const payload = await getPayloadClient();
+  const { docs } = await payload.find({
+    collection: 'posts',
+    where: {
+      slug: {
+        equals: slug,
+      },
+      status: {
+        equals: 'published',
+      },
+    },
+    limit: 1,
+  });
 
-  return { ...data, slug: realSlug, content } as Post;
+  if (docs.length === 0) {
+    return null;
+  }
+
+  const post = docs[0];
+  
+  // Convert rich text to HTML string
+  const content = serialize(post.content);
+
+  // Handle cover image
+  let coverImage = '';
+  if (post.coverImage && typeof post.coverImage === 'object') {
+    coverImage = post.coverImage.url || '';
+  }
+
+  // Handle author picture
+  let authorPicture = '';
+  if (post.author?.picture && typeof post.author.picture === 'object') {
+    authorPicture = post.author.picture.url || '';
+  }
+
+  return {
+    slug: post.slug,
+    title: post.title,
+    date: post.date,
+    coverImage,
+    author: {
+      name: post.author?.name || 'Unknown',
+      picture: authorPicture,
+    },
+    excerpt: post.excerpt,
+    ogImage: {
+      url: coverImage,
+    },
+    content,
+  };
 }
 
-export function getAllPosts(): Post[] {
-  const slugs = getPostSlugs();
-  const posts = slugs
-    .map((slug) => getPostBySlug(slug))
-    // sort posts by date in descending order
-    .sort((post1, post2) => (post1.date > post2.date ? -1 : 1));
+export async function getAllPosts(): Promise<Post[]> {
+  const payload = await getPayloadClient();
+  const { docs } = await payload.find({
+    collection: 'posts',
+    where: {
+      status: {
+        equals: 'published',
+      },
+    },
+    sort: '-date',
+    limit: 1000,
+  });
+
+  const posts = docs.map((post) => {
+    const content = serialize(post.content);
+    
+    let coverImage = '';
+    if (post.coverImage && typeof post.coverImage === 'object') {
+      coverImage = post.coverImage.url || '';
+    }
+
+    let authorPicture = '';
+    if (post.author?.picture && typeof post.author.picture === 'object') {
+      authorPicture = post.author.picture.url || '';
+    }
+
+    return {
+      slug: post.slug,
+      title: post.title,
+      date: post.date,
+      coverImage,
+      author: {
+        name: post.author?.name || 'Unknown',
+        picture: authorPicture,
+      },
+      excerpt: post.excerpt,
+      ogImage: {
+        url: coverImage,
+      },
+      content,
+    };
+  });
+
   return posts;
 }
+
