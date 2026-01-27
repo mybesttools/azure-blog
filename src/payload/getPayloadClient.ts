@@ -1,5 +1,5 @@
-import payload from 'payload';
-import { InitOptions } from 'payload/dist/types';
+import { getPayload } from 'payload';
+import config from '../../payload.config';
 
 let cached = (global as any).payload;
 
@@ -10,11 +10,7 @@ if (!cached) {
   };
 }
 
-interface Args {
-  initOptions?: Partial<InitOptions>;
-}
-
-export const getPayloadClient = async ({ initOptions }: Args = {}): Promise<typeof payload> => {
+export const getPayloadClient = async () => {
   if (!process.env.PAYLOAD_SECRET) {
     throw new Error('PAYLOAD_SECRET is missing');
   }
@@ -24,10 +20,8 @@ export const getPayloadClient = async ({ initOptions }: Args = {}): Promise<type
   }
 
   if (!cached.promise) {
-    cached.promise = payload.init({
-      secret: process.env.PAYLOAD_SECRET,
-      local: initOptions?.express ? false : true,
-      ...(initOptions || {}),
+    cached.promise = getPayload({
+      config,
     });
   }
 
@@ -40,3 +34,4 @@ export const getPayloadClient = async ({ initOptions }: Args = {}): Promise<type
 
   return cached.client;
 };
+

@@ -1,8 +1,9 @@
-import payload from 'payload';
+import { getPayload } from 'payload';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import dotenv from 'dotenv';
+import config from '../payload.config';
 
 dotenv.config();
 
@@ -10,9 +11,8 @@ const postsDir = path.join(process.cwd(), '_posts');
 
 async function migrate() {
   // Initialize Payload
-  await payload.init({
-    secret: process.env.PAYLOAD_SECRET || 'your-secret-key-here',
-    local: true,
+  const payload = await getPayload({
+    config,
   });
 
   console.log('Starting migration...');
@@ -45,17 +45,23 @@ async function migrate() {
         continue;
       }
 
-      // Convert markdown content to rich text format for Slate
-      const richTextContent = [
-        {
-          type: 'paragraph',
+      // Convert markdown content to rich text format for Lexical
+      const richTextContent = {
+        root: {
+          type: 'root',
           children: [
             {
-              text: content,
+              type: 'paragraph',
+              children: [
+                {
+                  type: 'text',
+                  text: content,
+                },
+              ],
             },
           ],
         },
-      ];
+      };
 
       // Create the post
       await payload.create({

@@ -1,8 +1,7 @@
 import { Post } from "@/interfaces/post";
 import { getPayloadClient } from "@/payload/getPayloadClient";
-import { serialize } from '@payloadcms/richtext-slate/dist/serialize';
 
-export async function getPostSlugs() {
+export async function getPostSlugs(): Promise<string[]> {
   const payload = await getPayloadClient();
   const { docs } = await payload.find({
     collection: 'posts',
@@ -13,7 +12,7 @@ export async function getPostSlugs() {
     },
     limit: 1000,
   });
-  return docs.map((post) => post.slug);
+  return docs.map((post: any) => post.slug);
 }
 
 export async function getPostBySlug(slug: string): Promise<Post | null> {
@@ -35,10 +34,10 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
     return null;
   }
 
-  const post = docs[0];
+  const post: any = docs[0];
   
   // Convert rich text to HTML string
-  const content = serialize(post.content);
+  const content = JSON.stringify(post.content);
 
   // Handle cover image
   let coverImage = '';
@@ -82,8 +81,8 @@ export async function getAllPosts(): Promise<Post[]> {
     limit: 1000,
   });
 
-  const posts = docs.map((post) => {
-    const content = serialize(post.content);
+  const posts = docs.map((post: any) => {
+    const content = JSON.stringify(post.content);
     
     let coverImage = '';
     if (post.coverImage && typeof post.coverImage === 'object') {

@@ -4,6 +4,8 @@ import { Intro } from "@/app/_components/intro";
 import { MoreStories } from "@/app/_components/more-stories";
 import { getAllPosts } from "@/lib/api";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Index() {
   const allPosts = await getAllPosts();
 

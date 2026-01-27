@@ -9,6 +9,8 @@ import { PostBody } from "@/app/_components/post-body";
 import { PostHeader } from "@/app/_components/post-header";
 import { Disqus } from "@/app/_components/disqus";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Post(props: Params) {
   const params = await props.params;
   const post = await getPostBySlug(params.slug);
@@ -63,9 +65,7 @@ export async function generateMetadata(props: Params): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  const posts = await getAllPosts();
-
-  return posts.map((post) => ({
-    slug: post.slug,
-  }));
+  // Return empty array to skip static generation
+  // Posts will be rendered on demand
+  return [];
 }
