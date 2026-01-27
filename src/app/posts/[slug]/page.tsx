@@ -65,7 +65,13 @@ export async function generateMetadata(props: Params): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  // Return empty array to skip static generation
-  // Posts will be rendered on demand
+  // Returning empty array to skip static generation during build time
+  // This is necessary because:
+  // 1. MongoDB connection is required to fetch posts
+  // 2. Database may not be available during build
+  // 3. Posts will be rendered on-demand with server-side rendering
+  // 
+  // Trade-off: No pre-rendering at build time, but content is always fresh
+  // For better SEO/performance in production, consider using ISR (Incremental Static Regeneration)
   return [];
 }

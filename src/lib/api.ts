@@ -1,5 +1,6 @@
 import { Post } from "@/interfaces/post";
 import { getPayloadClient } from "@/payload/getPayloadClient";
+import { lexicalToHtml } from "@/lib/lexicalToHtml";
 
 export async function getPostSlugs(): Promise<string[]> {
   const payload = await getPayloadClient();
@@ -36,8 +37,8 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
 
   const post: any = docs[0];
   
-  // Convert rich text to HTML string
-  const content = JSON.stringify(post.content);
+  // Convert Lexical rich text to HTML
+  const content = lexicalToHtml(post.content);
 
   // Handle cover image
   let coverImage = '';
@@ -82,7 +83,8 @@ export async function getAllPosts(): Promise<Post[]> {
   });
 
   const posts = docs.map((post: any) => {
-    const content = JSON.stringify(post.content);
+    // Convert Lexical rich text to HTML
+    const content = lexicalToHtml(post.content);
     
     let coverImage = '';
     if (post.coverImage && typeof post.coverImage === 'object') {

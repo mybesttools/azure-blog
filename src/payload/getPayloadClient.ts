@@ -34,4 +34,3 @@ export const getPayloadClient = async () => {
 
   return cached.client;
 };
-
