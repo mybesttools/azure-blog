@@ -9,18 +9,22 @@
 
 This guide covers three deployment options for Azure:
 
-1. **Azure Container Apps** (Recommended for Production) - ~$20-25/month
-   - Automatic scaling, managed HTTPS, best for production
+1. **Azure Container Instances** (Recommended) - ~$10-15/month
+   - Simple, cost-effective, easy to manage, ideal for blogs and low-traffic sites
 2. **Azure App Service** - ~$18/month
    - Traditional PaaS, simple deployment, good for standard workloads
-3. **Azure Container Instances** - ~$10/month
-   - Budget option, suitable for development or low-traffic sites
+3. **Azure Container Apps** - ~$20-25/month
+   - Advanced features with automatic scaling, managed HTTPS, best for high-traffic production
 
 All options use MongoDB Atlas (free tier) for the database.
 
-## Low-Cost Deployment Option
+## Recommended: Azure Container Instances Deployment
 
-This section covers Azure App Service deployment. For Container Apps (recommended for production), see the section below.
+Azure Container Instances provides a simple, cost-effective way to run containerized applications without managing infrastructure. Perfect for blogs and low to medium traffic sites.
+
+### Prerequisites
+1. Complete MongoDB Atlas setup (see below)
+2. Build and push Docker image to Azure Container Registry (see below)
 
 ### 1. Set up MongoDB Atlas (Free Tier)
 
@@ -30,52 +34,12 @@ This section covers Azure App Service deployment. For Container Apps (recommende
 4. Whitelist your IP and Azure IPs (0.0.0.0/0 for development)
 5. Get your connection string
 
-### 2. Deploy to Azure App Service
+### 2. Set up Azure Container Registry
 
 #### Create a Resource Group
 ```bash
 az group create --name azure-blog-rg --location eastus
 ```
-
-#### Create an App Service Plan (Linux, Basic B1 - ~$13/month)
-```bash
-az appservice plan create \
-  --name azure-blog-plan \
-  --resource-group azure-blog-rg \
-  --is-linux \
-  --sku B1
-```
-
-#### Create a Web App for Containers
-```bash
-az webapp create \
-  --resource-group azure-blog-rg \
-  --plan azure-blog-plan \
-  --name your-blog-name \
-  --deployment-container-image-name nginx
-```
-
-#### Configure Environment Variables
-```bash
-az webapp config appsettings set \
-  --resource-group azure-blog-rg \
-  --name your-blog-name \
-  --settings \
-    MONGODB_URI="your-mongodb-atlas-connection-string" \
-    PAYLOAD_SECRET="your-generated-secret-key" \
-    PAYLOAD_PUBLIC_SERVER_URL="https://your-blog-name.azurewebsites.net" \
-    NEXT_PUBLIC_SERVER_URL="https://your-blog-name.azurewebsites.net"
-```
-
-#### Enable Container Logging
-```bash
-az webapp log config \
-  --name your-blog-name \
-  --resource-group azure-blog-rg \
-  --docker-container-logging filesystem
-```
-
-### 3. Deploy Using Azure Container Registry
 
 #### Create Azure Container Registry
 ```bash
@@ -97,46 +61,151 @@ docker build -t yourblogacr.azurecr.io/azure-blog:latest .
 docker push yourblogacr.azurecr.io/azure-blog:latest
 ```
 
-#### Configure Web App to use ACR
+### 3. Deploy to Azure Container Instances
+
+#### Create Container Instance with ACR Authentication
 ```bash
-az webapp config container set \
-  --name your-blog-name \
+az container create \
   --resource-group azure-blog-rg \
-  --docker-custom-image-name yourblogacr.azurecr.io/azure-blog:latest \
-  --docker-registry-server-url https://yourblogacr.azurecr.io
+  --name azure-blog \
+  --image yourblogacr.azurecr.io/azure-blog:latest \
+  --registry-login-server yourblogacr.azurecr.io \
+  --registry-username $(az acr credential show --name yourblogacr --query username -o tsv) \
+  --registry-password $(az acr credential show --name yourblogacr --query passwords[0].value -o tsv) \
+  --dns-name-label your-unique-dns-name \
+  --ports 3000 \
+  --environment-variables \
+    MONGODB_URI="your-mongodb-atlas-connection-string" \
+    PAYLOAD_SECRET="your-generated-secret-key" \
+    PAYLOAD_PUBLIC_SERVER_URL="http://your-unique-dns-name.eastus.azurecontainer.io:3000" \
+    NEXT_PUBLIC_SERVER_URL="http://your-unique-dns-name.eastus.azurecontainer.io:3000" \
+  --cpu 1 \
+  --memory 1.5
 ```
 
-### 4. Set up Continuous Deployment (Optional)
+**Note**: Replace `your-unique-dns-name` with a globally unique DNS label for your container.
 
-Enable CI/CD webhook:
+#### Verify Deployment
 ```bash
-az webapp deployment container config \
-  --name your-blog-name \
+# Check container status
+az container show \
   --resource-group azure-blog-rg \
-  --enable-cd true
+  --name azure-blog \
+  --query "{FQDN:ipAddress.fqdn,ProvisioningState:provisioningState}" \
+  --output table
+
+# View logs
+az container logs \
+  --resource-group azure-blog-rg \
+  --name azure-blog
 ```
 
-### 5. Access Your Blog
+### 4. Access Your Blog
 
-- Blog: `https://your-blog-name.azurewebsites.net`
-- Admin Panel: `https://your-blog-name.azurewebsites.net/admin`
+- Blog: `http://your-unique-dns-name.eastus.azurecontainer.io:3000`
+- Admin Panel: `http://your-unique-dns-name.eastus.azurecontainer.io:3000/admin`
 
-## Cost Breakdown (Approximate)
+### 5. Update the Application
 
-- Azure App Service (B1): ~$13/month
+When you need to deploy updates:
+
+```bash
+# Build and push new image
+docker build -t yourblogacr.azurecr.io/azure-blog:latest .
+docker push yourblogacr.azurecr.io/azure-blog:latest
+
+# Delete and recreate the container
+az container delete \
+  --resource-group azure-blog-rg \
+  --name azure-blog \
+  --yes
+
+# Recreate with the same command as above
+az container create \
+  --resource-group azure-blog-rg \
+  --name azure-blog \
+  --image yourblogacr.azurecr.io/azure-blog:latest \
+  --registry-login-server yourblogacr.azurecr.io \
+  --registry-username $(az acr credential show --name yourblogacr --query username -o tsv) \
+  --registry-password $(az acr credential show --name yourblogacr --query passwords[0].value -o tsv) \
+  --dns-name-label your-unique-dns-name \
+  --ports 3000 \
+  --environment-variables \
+    MONGODB_URI="your-mongodb-atlas-connection-string" \
+    PAYLOAD_SECRET="your-generated-secret-key" \
+    PAYLOAD_PUBLIC_SERVER_URL="http://your-unique-dns-name.eastus.azurecontainer.io:3000" \
+    NEXT_PUBLIC_SERVER_URL="http://your-unique-dns-name.eastus.azurecontainer.io:3000" \
+  --cpu 1 \
+  --memory 1.5
+```
+
+### Cost Breakdown (Container Instances)
+- Azure Container Instances (1 vCPU, 1.5GB RAM): ~$10-15/month
 - Azure Container Registry (Basic): ~$5/month
 - MongoDB Atlas (Free tier): $0
 
-**Total: ~$18/month**
+**Total: ~$15-20/month**
+
+**Benefits of Container Instances:**
+- Simple and cost-effective
+- No infrastructure management
+- Fast deployment
+- Pay only for actual usage
+- Perfect for blogs and low to medium traffic sites
+
+## Alternative: Azure App Service
+
+For traditional PaaS deployment (~$18/month):
+
+#### Create a Resource Group
+```bash
+az group create --name azure-blog-rg --location eastus
+```
+
+## Alternative: Azure App Service
+
+For traditional PaaS deployment (~$18/month):
+
+#### Create an App Service Plan (Linux, Basic B1)
+```bash
+az appservice plan create \
+  --name azure-blog-plan \
+  --resource-group azure-blog-rg \
+  --is-linux \
+  --sku B1
+```
+
+#### Create a Web App for Containers
+```bash
+az webapp create \
+  --resource-group azure-blog-rg \
+  --plan azure-blog-plan \
+  --name your-blog-name \
+  --deployment-container-image-name yourblogacr.azurecr.io/azure-blog:latest \
+  --docker-registry-server-url https://yourblogacr.azurecr.io
+```
+
+#### Configure Environment Variables
+```bash
+az webapp config appsettings set \
+  --resource-group azure-blog-rg \
+  --name your-blog-name \
+  --settings \
+    MONGODB_URI="your-mongodb-atlas-connection-string" \
+    PAYLOAD_SECRET="your-generated-secret-key" \
+    PAYLOAD_PUBLIC_SERVER_URL="https://your-blog-name.azurewebsites.net" \
+    NEXT_PUBLIC_SERVER_URL="https://your-blog-name.azurewebsites.net"
+```
+
+**Access**: `https://your-blog-name.azurewebsites.net`
+
+**Cost**: ~$18/month (App Service B1 + ACR)
 
 ## Alternative: Azure Container Apps (Recommended for Production)
 
-Azure Container Apps is a modern, fully managed container platform with automatic scaling and built-in load balancing. This is the recommended option for production workloads.
+## Alternative: Azure Container Apps
 
-### Prerequisites
-- Complete steps 1-3 above (MongoDB Atlas and Azure Container Registry)
-
-### Deploy to Azure Container Apps
+For high-traffic production workloads with auto-scaling (~$20-25/month):
 
 #### Create Container Apps Environment
 ```bash
@@ -167,82 +236,45 @@ az containerapp create \
     NEXT_PUBLIC_SERVER_URL="https://azure-blog-app.{location}.azurecontainerapps.io"
 ```
 
-**Note**: Replace `{location}` with your actual Azure region (e.g., `eastus`).
+**Access**: Container Apps provides a managed HTTPS endpoint automatically.
 
-#### Enable ACR Authentication
+**Cost**: ~$20-25/month (Container Apps + ACR)
+
+**Benefits**: Automatic scaling, managed HTTPS, zero-downtime deployments
+
+## Maintenance and Troubleshooting
+
+### View Container Logs (Container Instances)
 ```bash
-az containerapp registry set \
-  --name azure-blog-app \
-  --resource-group azure-blog-rg \
-  --server yourblogacr.azurecr.io \
-  --username $(az acr credential show --name yourblogacr --query username -o tsv) \
-  --password $(az acr credential show --name yourblogacr --query passwords[0].value -o tsv)
-```
-
-#### Update Container App (For redeployments)
-```bash
-# Build and push new image
-docker build -t yourblogacr.azurecr.io/azure-blog:latest .
-docker push yourblogacr.azurecr.io/azure-blog:latest
-
-# Update the container app
-az containerapp update \
-  --name azure-blog-app \
-  --resource-group azure-blog-rg \
-  --image yourblogacr.azurecr.io/azure-blog:latest
-```
-
-### Cost Breakdown (Container Apps)
-- Azure Container Apps (0.5 vCPU, 1GB RAM): ~$15-20/month
-- Azure Container Registry (Basic): ~$5/month
-- MongoDB Atlas (Free tier): $0
-
-**Total: ~$20-25/month**
-
-**Benefits of Container Apps:**
-- Automatic scaling (0 to multiple replicas)
-- Built-in HTTPS with managed certificates
-- Integrated ingress/load balancing
-- Simplified deployment and updates
-- Better for production workloads
-
-## Alternative: Lower Cost with Azure Container Instances
-
-For development or low-traffic sites (~$10/month), you can use Azure Container Instances:
-
-```bash
-az container create \
+# Real-time logs
+az container logs \
   --resource-group azure-blog-rg \
   --name azure-blog \
-  --image yourblogacr.azurecr.io/azure-blog:latest \
-  --dns-name-label your-unique-dns-name \
-  --ports 3000 \
-  --environment-variables \
-    MONGODB_URI="your-connection-string" \
-    PAYLOAD_SECRET="your-secret" \
-    PAYLOAD_PUBLIC_SERVER_URL="http://your-unique-dns-name.eastus.azurecontainer.io:3000" \
-  --cpu 1 \
-  --memory 1.5
+  --follow
+
+# Check container status
+az container show \
+  --resource-group azure-blog-rg \
+  --name azure-blog \
+  --output table
 ```
 
-## Maintenance
-
-### Update the Application
-```bash
-# Build new image
-docker build -t yourblogacr.azurecr.io/azure-blog:latest .
-
-# Push to ACR
-docker push yourblogacr.azurecr.io/azure-blog:latest
-
-# Restart the web app
-az webapp restart --name your-blog-name --resource-group azure-blog-rg
-```
-
-### View Logs
+### View Logs (App Service)
 ```bash
 az webapp log tail --name your-blog-name --resource-group azure-blog-rg
 ```
+
+### Troubleshooting
+
+**Container won't start:**
+- Check logs: `az container logs --resource-group azure-blog-rg --name azure-blog`
+- Verify environment variables are set correctly
+- Ensure MongoDB connection string is valid
+
+**Can't access admin panel:**
+- Verify the container is running: `az container show --resource-group azure-blog-rg --name azure-blog`
+- Check FQDN is correct
+- Ensure ports are properly configured (port 3000)
 
 ### Create First Admin User
 

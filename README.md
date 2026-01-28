@@ -8,8 +8,8 @@ A modern blog powered by Next.js and Payload CMS, designed for deployment on low
 - **Payload CMS**: Powerful, self-hosted content management system with admin panel
 - **MongoDB**: Flexible document database for content storage
 - **Docker Support**: Containerized for easy deployment
-- **Azure Ready**: Optimized for Azure Container Apps, App Service, and Container Instances
-- **Low Cost**: Starting from ~$18/month with MongoDB Atlas free tier
+- **Azure Ready**: Optimized for Azure Container Instances (recommended), App Service, and Container Apps
+- **Low Cost**: Starting from ~$15-20/month with MongoDB Atlas free tier
 
 ## Getting Started
 

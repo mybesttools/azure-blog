@@ -38,12 +38,12 @@ Successfully transformed the Azure Blog from a static Next.js site to a server-s
 ### Cost Analysis
 **Azure Hosting Options:**
 
-1. **Container Apps (Recommended for Production)**
-   - Container Apps (0.5 vCPU, 1GB): ~$15-20/month
+1. **Container Instances (Recommended)**
+   - Container Instances (1 vCPU, 1.5GB): ~$10-15/month
    - Azure Container Registry: ~$5/month
    - MongoDB Atlas: Free tier
-   - **Total: ~$20-25/month**
-   - Benefits: Auto-scaling, managed HTTPS, production-ready
+   - **Total: ~$15-20/month**
+   - Benefits: Simple, cost-effective, perfect for blogs
 
 2. **App Service**
    - App Service Plan (B1): ~$13/month
@@ -51,10 +51,12 @@ Successfully transformed the Azure Blog from a static Next.js site to a server-s
    - MongoDB Atlas: Free tier
    - **Total: ~$18/month**
 
-3. **Container Instances (Budget Option)**
-   - Container Instance: ~$10/month
+3. **Container Apps**
+   - Container Apps (0.5 vCPU, 1GB): ~$15-20/month
+   - Azure Container Registry: ~$5/month
    - MongoDB Atlas: Free tier
-   - **Total: ~$10/month**
+   - **Total: ~$20-25/month**
+   - Benefits: Auto-scaling, managed HTTPS, production-ready
 
 ### Files Added
 ```
