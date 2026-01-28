@@ -5,9 +5,22 @@
 - Azure CLI installed
 - Docker installed locally
 
+## Deployment Options
+
+This guide covers three deployment options for Azure:
+
+1. **Azure Container Apps** (Recommended for Production) - ~$20-25/month
+   - Automatic scaling, managed HTTPS, best for production
+2. **Azure App Service** - ~$18/month
+   - Traditional PaaS, simple deployment, good for standard workloads
+3. **Azure Container Instances** - ~$10/month
+   - Budget option, suitable for development or low-traffic sites
+
+All options use MongoDB Atlas (free tier) for the database.
+
 ## Low-Cost Deployment Option
 
-This guide deploys the blog as a containerized application on Azure App Service with MongoDB Atlas (free tier).
+This section covers Azure App Service deployment. For Container Apps (recommended for production), see the section below.
 
 ### 1. Set up MongoDB Atlas (Free Tier)
 
@@ -116,9 +129,86 @@ az webapp deployment container config \
 
 **Total: ~$18/month**
 
-## Alternative: Even Lower Cost with Azure Container Instances
+## Alternative: Azure Container Apps (Recommended for Production)
 
-For even lower costs (~$10/month), you can use Azure Container Instances instead of App Service:
+Azure Container Apps is a modern, fully managed container platform with automatic scaling and built-in load balancing. This is the recommended option for production workloads.
+
+### Prerequisites
+- Complete steps 1-3 above (MongoDB Atlas and Azure Container Registry)
+
+### Deploy to Azure Container Apps
+
+#### Create Container Apps Environment
+```bash
+az containerapp env create \
+  --name azure-blog-env \
+  --resource-group azure-blog-rg \
+  --location eastus
+```
+
+#### Create Container App
+```bash
+az containerapp create \
+  --name azure-blog-app \
+  --resource-group azure-blog-rg \
+  --environment azure-blog-env \
+  --image yourblogacr.azurecr.io/azure-blog:latest \
+  --registry-server yourblogacr.azurecr.io \
+  --target-port 3000 \
+  --ingress external \
+  --min-replicas 1 \
+  --max-replicas 3 \
+  --cpu 0.5 \
+  --memory 1.0Gi \
+  --env-vars \
+    MONGODB_URI="your-mongodb-atlas-connection-string" \
+    PAYLOAD_SECRET="your-generated-secret-key" \
+    PAYLOAD_PUBLIC_SERVER_URL="https://azure-blog-app.{location}.azurecontainerapps.io" \
+    NEXT_PUBLIC_SERVER_URL="https://azure-blog-app.{location}.azurecontainerapps.io"
+```
+
+**Note**: Replace `{location}` with your actual Azure region (e.g., `eastus`).
+
+#### Enable ACR Authentication
+```bash
+az containerapp registry set \
+  --name azure-blog-app \
+  --resource-group azure-blog-rg \
+  --server yourblogacr.azurecr.io \
+  --username $(az acr credential show --name yourblogacr --query username -o tsv) \
+  --password $(az acr credential show --name yourblogacr --query passwords[0].value -o tsv)
+```
+
+#### Update Container App (For redeployments)
+```bash
+# Build and push new image
+docker build -t yourblogacr.azurecr.io/azure-blog:latest .
+docker push yourblogacr.azurecr.io/azure-blog:latest
+
+# Update the container app
+az containerapp update \
+  --name azure-blog-app \
+  --resource-group azure-blog-rg \
+  --image yourblogacr.azurecr.io/azure-blog:latest
+```
+
+### Cost Breakdown (Container Apps)
+- Azure Container Apps (0.5 vCPU, 1GB RAM): ~$15-20/month
+- Azure Container Registry (Basic): ~$5/month
+- MongoDB Atlas (Free tier): $0
+
+**Total: ~$20-25/month**
+
+**Benefits of Container Apps:**
+- Automatic scaling (0 to multiple replicas)
+- Built-in HTTPS with managed certificates
+- Integrated ingress/load balancing
+- Simplified deployment and updates
+- Better for production workloads
+
+## Alternative: Lower Cost with Azure Container Instances
+
+For development or low-traffic sites (~$10/month), you can use Azure Container Instances:
 
 ```bash
 az container create \
