@@ -17,6 +17,10 @@ export async function POST(req: NextRequest) {
     // Use raw MongoDB driver to avoid any model caching issues
     const db = (await connectDB()).connection.db;
 
+    if (!db) {
+      throw new Error('Database connection is not available');
+    }
+
     const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await db.collection('users').findOne({
       email: { $regex: `^${escapedEmail}$`, $options: 'i' },
