@@ -51,8 +51,7 @@ export async function POST() {
     const otpauth = totp.toURI({
       label: user.email,
       issuer: 'Azure Blog',
-      secret,
-      image: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/favicon/android-chrome-192x192.png`,
+      secret
     });
 
     // Generate QR code
