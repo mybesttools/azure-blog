@@ -60,6 +60,9 @@ export async function POST() {
     // Store secret using raw MongoDB driver to bypass Mongoose
     console.log('Updating user with secret...');
     const db = (await connectDB()).connection.db;
+    if (!db) {
+      throw new Error('Database connection is not available');
+    }
     const updateResult = await db.collection('users').updateOne(
       { _id: user._id },
       { 
