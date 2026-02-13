@@ -32,11 +32,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/payload.config.ts ./payload.config.ts
 
-# Create media directory
-RUN mkdir -p /app/public/media
-RUN chown -R nextjs:nodejs /app/public/media
+# Create uploads directory
+RUN mkdir -p /app/public/uploads
+RUN chown -R nextjs:nodejs /app/public/uploads
 
 USER nextjs
 

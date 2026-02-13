@@ -1,19 +1,17 @@
-import { getPayload } from 'payload';
+import { connectDB } from '../src/lib/mongodb';
+import Post from '../src/models/Post';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import dotenv from 'dotenv';
-import config from '../payload.config';
 
 dotenv.config();
 
 const postsDir = path.join(process.cwd(), '_posts');
 
 async function migrate() {
-  // Initialize Payload
-  const payload = await getPayload({
-    config,
-  });
+  // Connect to MongoDB
+  await connectDB();
 
   console.log('Starting migration...');
 
@@ -31,16 +29,9 @@ async function migrate() {
 
     try {
       // Check if post already exists
-      const existing = await payload.find({
-        collection: 'posts',
-        where: {
-          slug: {
-            equals: slug,
-          },
-        },
-      });
+      const existing = await Post.findOne({ slug });
 
-      if (existing.docs.length > 0) {
+      if (existing) {
         console.log(`  Post ${slug} already exists, skipping...`);
         continue;
       }
@@ -64,19 +55,18 @@ async function migrate() {
       };
 
       // Create the post
-      await payload.create({
-        collection: 'posts',
-        data: {
-          title: data.title,
-          excerpt: data.excerpt || '',
-          content: richTextContent,
-          date: data.date,
-          author: {
-            name: data.author?.name || 'Unknown',
-          },
-          slug: slug,
-          status: 'published',
+      await Post.create({
+        title: data.title,
+        excerpt: data.excerpt || '',
+        content: richTextContent,
+        date: data.date,
+        author: {
+          name: data.author?.name || 'Unknown',
+          picture: data.author?.picture || '',
         },
+        slug: slug,
+        status: 'published',
+        coverImage: data.coverImage || '',
       });
 
       console.log(`  ✓ Migrated ${slug}`);

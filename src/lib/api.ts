@@ -1,118 +1,127 @@
 import { Post } from "@/interfaces/post";
-import { getPayloadClient } from "@/payload/getPayloadClient";
+import { connectDB } from "@/lib/mongodb";
+import PostModel from "@/models/Post";
 import { lexicalToHtml } from "@/lib/lexicalToHtml";
+import markdownToHtml from "@/lib/markdownToHtml";
 
 export async function getPostSlugs(): Promise<string[]> {
-  const payload = await getPayloadClient();
-  const { docs } = await payload.find({
-    collection: 'posts',
-    where: {
-      status: {
-        equals: 'published',
-      },
-    },
-    limit: 1000,
-  });
-  return docs.map((post: any) => post.slug);
+  await connectDB();
+  const posts = await PostModel.find({ status: 'published' }, 'slug').lean();
+  return posts.map((post: any) => post.slug);
 }
 
 export async function getPostBySlug(slug: string): Promise<Post | null> {
-  const payload = await getPayloadClient();
-  const { docs } = await payload.find({
-    collection: 'posts',
-    where: {
-      slug: {
-        equals: slug,
-      },
-      status: {
-        equals: 'published',
-      },
-    },
-    limit: 1,
-  });
+  await connectDB();
+  const post = await PostModel.findOne({ slug, status: 'published' })
+    .populate('coverImage')
+    .populate('author.picture')
+    .lean();
 
-  if (docs.length === 0) {
+  if (!post) {
     return null;
   }
 
-  const post: any = docs[0];
-  
-  // Convert Lexical rich text to HTML
-  const content = lexicalToHtml(post.content);
+  // Convert content to HTML - handle both markdown strings and Lexical JSON
+  let content: string;
+  if (typeof post.content === 'string') {
+    // It's markdown, convert to HTML
+    content = await markdownToHtml(post.content);
+  } else {
+    // It's Lexical JSON, convert to HTML
+    content = lexicalToHtml(post.content);
+  }
 
   // Handle cover image
   let coverImage = '';
-  if (post.coverImage && typeof post.coverImage === 'object') {
-    coverImage = post.coverImage.url || '';
+  if (post.coverImage) {
+    if (typeof post.coverImage === 'object' && 'url' in post.coverImage) {
+      coverImage = (post.coverImage as any).url || '';
+    } else if (typeof post.coverImage === 'string') {
+      // If it's already a string path, use it directly
+      coverImage = post.coverImage;
+    }
   }
 
   // Handle author picture
   let authorPicture = '';
-  if (post.author?.picture && typeof post.author.picture === 'object') {
-    authorPicture = post.author.picture.url || '';
+  if (post.author?.picture) {
+    if (typeof post.author.picture === 'object' && 'url' in post.author.picture) {
+      authorPicture = (post.author.picture as any).url || '';
+    } else if (typeof post.author.picture === 'string') {
+      // If it's already a string path, use it directly
+      authorPicture = post.author.picture;
+    }
   }
 
   return {
     slug: post.slug,
     title: post.title,
-    date: post.date,
-    coverImage,
+    date: post.date.toISOString(),
+    coverImage: coverImage || '/assets/blog/preview/cover.jpg',
     author: {
       name: post.author?.name || 'Unknown',
-      picture: authorPicture,
+      picture: authorPicture || '/assets/blog/authors/jj.jpeg',
     },
     excerpt: post.excerpt,
     ogImage: {
-      url: coverImage,
+      url: coverImage || '/assets/blog/preview/cover.jpg',
     },
     content,
   };
 }
 
 export async function getAllPosts(): Promise<Post[]> {
-  const payload = await getPayloadClient();
-  const { docs } = await payload.find({
-    collection: 'posts',
-    where: {
-      status: {
-        equals: 'published',
-      },
-    },
-    sort: '-date',
-    limit: 1000,
-  });
+  await connectDB();
+  const posts = await PostModel.find({ status: 'published' })
+    .populate('coverImage')
+    .populate('author.picture')
+    .sort({ date: -1 })
+    .lean();
 
-  const posts = docs.map((post: any) => {
-    // Convert Lexical rich text to HTML
-    const content = lexicalToHtml(post.content);
-    
+  return Promise.all(posts.map(async (post: any) => {
+    // Convert content to HTML - handle both markdown strings and Lexical JSON
+    let content: string;
+    if (typeof post.content === 'string') {
+      // It's markdown, convert to HTML
+      content = await markdownToHtml(post.content);
+    } else {
+      // It's Lexical JSON, convert to HTML
+      content = lexicalToHtml(post.content);
+    }
+
     let coverImage = '';
-    if (post.coverImage && typeof post.coverImage === 'object') {
-      coverImage = post.coverImage.url || '';
+    if (post.coverImage) {
+      if (typeof post.coverImage === 'object' && 'url' in post.coverImage) {
+        coverImage = post.coverImage.url || '';
+      } else if (typeof post.coverImage === 'string') {
+        coverImage = post.coverImage;
+      }
     }
 
     let authorPicture = '';
-    if (post.author?.picture && typeof post.author.picture === 'object') {
-      authorPicture = post.author.picture.url || '';
+    if (post.author?.picture) {
+      if (typeof post.author.picture === 'object' && 'url' in post.author.picture) {
+        authorPicture = post.author.picture.url || '';
+      } else if (typeof post.author.picture === 'string') {
+        authorPicture = post.author.picture;
+      }
     }
 
     return {
       slug: post.slug,
       title: post.title,
-      date: post.date,
-      coverImage,
+      date: post.date.toISOString(),
+      coverImage: coverImage || '/assets/blog/preview/cover.jpg',
       author: {
         name: post.author?.name || 'Unknown',
-        picture: authorPicture,
+        picture: authorPicture || '/assets/blog/authors/jj.jpeg',
       },
       excerpt: post.excerpt,
       ogImage: {
-        url: coverImage,
+        url: coverImage || '/assets/blog/preview/cover.jpg',
       },
       content,
     };
-  });
-
-  return posts;
+  }));
 }
 

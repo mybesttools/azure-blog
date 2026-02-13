@@ -3,6 +3,7 @@ import { CMS_NAME, HOME_OG_IMAGE_URL } from "@/lib/constants";
 import type { Metadata } from "next";
 import cn from "classnames";
 import { ThemeSwitcher } from "./_components/theme-switcher";
+import { ThemeProvider } from "./_components/theme-provider";
 import * as React from "react";
 
 import "./globals.css";
@@ -21,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="apple-touch-icon"
@@ -56,11 +57,14 @@ export default function RootLayout({
         <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
       </head>
       <body
+        suppressHydrationWarning
         className={cn("font-sans", "dark:bg-slate-900 dark:text-slate-400")}
       >
-  <ThemeSwitcher />
-  <div className="min-h-screen">{children}</div>
-  <Footer />
+        <ThemeProvider>
+          <ThemeSwitcher />
+          <div className="min-h-screen">{children}</div>
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );
