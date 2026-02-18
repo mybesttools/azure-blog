@@ -45,9 +45,12 @@ export async function POST(request: NextRequest) {
       crypto: new NobleCryptoPlugin(),
       base32: new ScureBase32Plugin(),
     });
-    const isValid = await totp.verify({
-      token,
-    });
+    const tokenValue = String(token ?? '').trim();
+    if (!/^[0-9]{6}$/.test(tokenValue)) {
+      return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
+    }
+
+    const isValid = await totp.verify(tokenValue);
     
     console.log('Verifying MFA token:', { token, secretLength: user.mfaSecret?.length, isValid });
 

@@ -29,12 +29,18 @@ const Header = () => {
               className="absolute right-0 mt-2 hidden min-w-[180px] rounded-md border border-gray-200 bg-white py-2 text-sm shadow-lg group-focus-within:block md:group-hover:block"
             >
               <li role="none">
-                <Link
-                  role="menuitem"
-                  href="/lab/html-intro"
-                  className="block px-4 py-2 hover:bg-gray-100"
-                >
-                  HTML Intro
+                <Link role="menuitem" href="/lab/list-elements" className="block px-4 py-2 hover:bg-gray-100">
+                  List Elements
+                </Link>
+              </li>
+              <li role="none">
+                <Link role="menuitem" href="/lab/nesting-and-indentation" className="block px-4 py-2 hover:bg-gray-100">
+                  Nesting and Indentation
+                </Link>
+              </li>
+              <li role="none">
+                <Link role="menuitem" href="/lab/anchor-elements" className="block px-4 py-2 hover:bg-gray-100">
+                  Anchor Elements
                 </Link>
               </li>
               <li role="none">
