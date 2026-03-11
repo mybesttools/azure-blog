@@ -28,6 +28,11 @@ jobs:
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest
 
+          # Mirror nginx:alpine to ACR so ACI doesn't pull from Docker Hub (rate limits)
+          docker pull nginx:alpine
+          docker tag nginx:alpine ${{ secrets.REGISTRY_LOGIN_SERVER }}/nginx:alpine
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/nginx:alpine
+
       - name: Log in to Azure
         uses: azure/login@v2
         with:
@@ -114,7 +119,7 @@ jobs:
                     {
                       "name": "nginx",
                       "properties": {
-                        "image": "nginx:alpine",
+                        "image": "[concat(parameters('registryServer'), '/nginx:alpine')]",
                         "ports": [
                           { "port": 80,  "protocol": "TCP" },
                           { "port": 443, "protocol": "TCP" }
