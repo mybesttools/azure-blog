@@ -1,0 +1,198 @@
+name: Build and Deploy to Azure Container Instances
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and Deploy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }} \
+                       -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest .
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Fetch TLS secrets from Key Vault
+        run: |
+          az keyvault secret show --vault-name mybesttoolskv --name tls-cert --query value -o tsv > tls.crt
+          az keyvault secret show --vault-name mybesttoolskv --name tls-key --query value -o tsv > tls.key
+
+      - name: Deploy to Azure Container Instances
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          REGISTRY_LOGIN_SERVER: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          NEXT_PUBLIC_GITHUB_OWNER: ${{ secrets.NEXT_PUBLIC_GITHUB_OWNER }}
+          NEXT_PUBLIC_GITHUB_REPO: ${{ secrets.NEXT_PUBLIC_GITHUB_REPO }}
+          NEXT_PUBLIC_GISCUS_REPO_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}
+          NEXT_PUBLIC_GISCUS_CATEGORY_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          ACI_DNS_NAME: ${{ secrets.ACI_DNS_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Base64-encode volume secrets (exported so Python subprocess can read via os.environ)
+          export NGINX_CONF_B64=$(base64 -w0 nginx/nginx.conf)
+          export TLS_CERT_B64=$(base64 -w0 tls.crt)
+          export TLS_KEY_B64=$(base64 -w0 tls.key)
+
+          # Delete existing container group to allow full recreation
+          az container delete \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name azure-blog --yes 2>/dev/null || true
+
+          # Write static ARM template (no secrets embedded here)
+          cat > aci-deploy.json << 'ARMEOF'
+          {
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {
+              "image":               { "type": "string" },
+              "registryServer":      { "type": "string" },
+              "registryUsername":    { "type": "string" },
+              "registryPassword":    { "type": "securestring" },
+              "mongodbUri":          { "type": "securestring" },
+              "nextauthSecret":      { "type": "securestring" },
+              "nextauthUrl":         { "type": "string" },
+              "githubOwner":         { "type": "string" },
+              "githubRepo":          { "type": "string" },
+              "giscusRepoId":        { "type": "string" },
+              "giscusCategoryId":    { "type": "string" },
+              "nginxConfB64":        { "type": "string" },
+              "tlsCertB64":          { "type": "string" },
+              "tlsKeyB64":           { "type": "securestring" },
+              "dnsNameLabel":        { "type": "string" }
+            },
+            "resources": [
+              {
+                "type": "Microsoft.ContainerInstance/containerGroups",
+                "apiVersion": "2023-05-01",
+                "name": "azure-blog",
+                "location": "[resourceGroup().location]",
+                "properties": {
+                  "containers": [
+                    {
+                      "name": "nextjs",
+                      "properties": {
+                        "image": "[parameters('image')]",
+                        "ports": [{ "port": 3000, "protocol": "TCP" }],
+                        "resources": { "requests": { "cpu": 0.8, "memoryInGB": 1.2 } },
+                        "environmentVariables": [
+                          { "name": "NEXTAUTH_URL",                 "value":       "[parameters('nextauthUrl')]" },
+                          { "name": "NEXT_PUBLIC_GITHUB_OWNER",     "value":       "[parameters('githubOwner')]" },
+                          { "name": "NEXT_PUBLIC_GITHUB_REPO",      "value":       "[parameters('githubRepo')]" },
+                          { "name": "NEXT_PUBLIC_GISCUS_REPO_ID",   "value":       "[parameters('giscusRepoId')]" },
+                          { "name": "NEXT_PUBLIC_GISCUS_CATEGORY_ID","value":      "[parameters('giscusCategoryId')]" },
+                          { "name": "MONGODB_URI",                  "secureValue": "[parameters('mongodbUri')]" },
+                          { "name": "NEXTAUTH_SECRET",              "secureValue": "[parameters('nextauthSecret')]" }
+                        ]
+                      }
+                    },
+                    {
+                      "name": "nginx",
+                      "properties": {
+                        "image": "nginx:alpine",
+                        "ports": [
+                          { "port": 80,  "protocol": "TCP" },
+                          { "port": 443, "protocol": "TCP" }
+                        ],
+                        "resources": { "requests": { "cpu": 0.2, "memoryInGB": 0.3 } },
+                        "volumeMounts": [
+                          { "name": "nginx-config", "mountPath": "/etc/nginx/conf.d", "readOnly": true },
+                          { "name": "nginx-certs",  "mountPath": "/etc/nginx/certs",  "readOnly": true }
+                        ]
+                      }
+                    }
+                  ],
+                  "volumes": [
+                    {
+                      "name": "nginx-config",
+                      "secret": { "default.conf": "[parameters('nginxConfB64')]" }
+                    },
+                    {
+                      "name": "nginx-certs",
+                      "secret": {
+                        "tls.crt": "[parameters('tlsCertB64')]",
+                        "tls.key": "[parameters('tlsKeyB64')]"
+                      }
+                    }
+                  ],
+                  "osType": "Linux",
+                  "restartPolicy": "Always",
+                  "ipAddress": {
+                    "type": "Public",
+                    "dnsNameLabel": "[parameters('dnsNameLabel')]",
+                    "ports": [
+                      { "port": 80,  "protocol": "TCP" },
+                      { "port": 443, "protocol": "TCP" }
+                    ]
+                  },
+                  "imageRegistryCredentials": [
+                    {
+                      "server":   "[parameters('registryServer')]",
+                      "username": "[parameters('registryUsername')]",
+                      "password": "[parameters('registryPassword')]"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          ARMEOF
+
+          # Generate parameters JSON via Python to safely handle special characters in secrets
+          python3 - << PYEOF
+          import json, os
+          params = {
+            "\$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {
+              "image":            {"value": os.environ["REGISTRY_LOGIN_SERVER"] + "/azure-blog:" + os.environ["IMAGE_TAG"]},
+              "registryServer":   {"value": os.environ["REGISTRY_LOGIN_SERVER"]},
+              "registryUsername": {"value": os.environ["REGISTRY_USERNAME"]},
+              "registryPassword": {"value": os.environ["REGISTRY_PASSWORD"]},
+              "mongodbUri":       {"value": os.environ["MONGODB_URI"]},
+              "nextauthSecret":   {"value": os.environ["NEXTAUTH_SECRET"]},
+              "nextauthUrl":      {"value": os.environ["NEXTAUTH_URL"]},
+              "githubOwner":      {"value": os.environ["NEXT_PUBLIC_GITHUB_OWNER"]},
+              "githubRepo":       {"value": os.environ["NEXT_PUBLIC_GITHUB_REPO"]},
+              "giscusRepoId":     {"value": os.environ["NEXT_PUBLIC_GISCUS_REPO_ID"]},
+              "giscusCategoryId": {"value": os.environ["NEXT_PUBLIC_GISCUS_CATEGORY_ID"]},
+              "nginxConfB64":     {"value": os.environ["NGINX_CONF_B64"]},
+              "tlsCertB64":       {"value": os.environ["TLS_CERT_B64"]},
+              "tlsKeyB64":        {"value": os.environ["TLS_KEY_B64"]},
+              "dnsNameLabel":     {"value": os.environ["ACI_DNS_NAME"]}
+            }
+          }
+          with open("params.json", "w") as f:
+            json.dump(params, f, indent=2)
+          PYEOF
+
+          az deployment group create \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file aci-deploy.json \
+            --parameters @params.json \
+            --name "azure-blog-$(date +%Y%m%d%H%M%S)"
