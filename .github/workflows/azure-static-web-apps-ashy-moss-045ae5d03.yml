@@ -1,50 +1,56 @@
-name: Azure Static Web Apps CI/CD
+name: Build and Deploy to Azure Container Instances
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
+
 jobs:
-  build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+  build_and_deploy:
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: Build and Deploy
+
     steps:
-      - name: "Setup User Configuration"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image
         run: |
-          # Configure git user for commit actions
-          # This is required to ensure that the GitHub Actions bot can commit changes if needed
-          # For example, if you are using a static site generator that requires a build step
-          # that generates files that need to be committed back to the repository.
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          chmod -R 777 .
-      - uses: actions/checkout@v2
+          docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }} \
+                       -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest .
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest
+
+      - name: Log in to Azure
+        uses: azure/login@v2
         with:
-          submodules: true
-      - name: Build And Deploy
-        id: builddeploy
-        uses: Azure/static-web-apps-deploy@v0.0.1-preview
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Container Instances
+        uses: azure/aci-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ASHY_MOSS_045AE5D03 }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
-          action: "upload"
-          app_location: "/" # App source code path
-          api_location: "" # Api source code path - optional
-          output_location: "out" # Built app content directory - optional
-          ###### End of Repository/Build Configurations ######
-  close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request Job
-    steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v0.0.1-preview
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ASHY_MOSS_045AE5D03 }}
-          action: "close"
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          dns-name-label: ${{ secrets.ACI_DNS_NAME }}
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
+          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+          name: azure-blog
+          location: eastus
+          ports: 3000
+          environment-variables: |
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            NEXT_PUBLIC_GITHUB_OWNER=${{ secrets.NEXT_PUBLIC_GITHUB_OWNER }}
+            NEXT_PUBLIC_GITHUB_REPO=${{ secrets.NEXT_PUBLIC_GITHUB_REPO }}
+            NEXT_PUBLIC_GISCUS_REPO_ID=${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}
+            NEXT_PUBLIC_GISCUS_CATEGORY_ID=${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
+          secure-environment-variables: |
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}

@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
