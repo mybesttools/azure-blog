@@ -33,24 +33,72 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Fetch TLS secrets from Key Vault
+        run: |
+          az keyvault secret show --vault-name mybesttoolskv --name tls-cert --query value -o tsv > tls.crt
+          az keyvault secret show --vault-name mybesttoolskv --name tls-key --query value -o tsv > tls.key
+
+      - name: Store TLS secrets in ACR as config
+        run: |
+          # Base64-encode for passing as env vars to ACI init container pattern
+          echo "TLS_CERT=$(base64 -w0 tls.crt)" >> $GITHUB_ENV
+          echo "TLS_KEY=$(base64 -w0 tls.key)" >> $GITHUB_ENV
+
       - name: Deploy to Azure Container Instances
-        uses: azure/aci-deploy@v1
-        with:
-          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          dns-name-label: ${{ secrets.ACI_DNS_NAME }}
-          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
-          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          registry-username: ${{ secrets.REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-          name: azure-blog
-          location: eastus
-          ports: 3000
-          environment-variables: |
-            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
-            NEXT_PUBLIC_GITHUB_OWNER=${{ secrets.NEXT_PUBLIC_GITHUB_OWNER }}
-            NEXT_PUBLIC_GITHUB_REPO=${{ secrets.NEXT_PUBLIC_GITHUB_REPO }}
-            NEXT_PUBLIC_GISCUS_REPO_ID=${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}
-            NEXT_PUBLIC_GISCUS_CATEGORY_ID=${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
-          secure-environment-variables: |
-            MONGODB_URI=${{ secrets.MONGODB_URI }}
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+        run: |
+          # Delete existing container group to allow full recreation
+          az container delete --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --name azure-blog --yes 2>/dev/null || true
+
+          az container create \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name azure-blog \
+            --dns-name-label ${{ secrets.ACI_DNS_NAME }} \
+            --location eastus \
+            --ports 80 443 \
+            --ip-address Public \
+            --restart-policy Always \
+            --registry-login-server ${{ secrets.REGISTRY_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.REGISTRY_USERNAME }} \
+            --registry-password ${{ secrets.REGISTRY_PASSWORD }} \
+            --containers-config '[
+              {
+                "name": "nextjs",
+                "image": "${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}",
+                "resources": { "requests": { "cpu": 0.8, "memoryInGb": 1.2 } },
+                "ports": [{ "port": 3000 }],
+                "environmentVariables": [
+                  { "name": "NEXTAUTH_URL", "value": "${{ secrets.NEXTAUTH_URL }}" },
+                  { "name": "NEXT_PUBLIC_GITHUB_OWNER", "value": "${{ secrets.NEXT_PUBLIC_GITHUB_OWNER }}" },
+                  { "name": "NEXT_PUBLIC_GITHUB_REPO", "value": "${{ secrets.NEXT_PUBLIC_GITHUB_REPO }}" },
+                  { "name": "NEXT_PUBLIC_GISCUS_REPO_ID", "value": "${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}" },
+                  { "name": "NEXT_PUBLIC_GISCUS_CATEGORY_ID", "value": "${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}" },
+                  { "name": "MONGODB_URI", "secureValue": "${{ secrets.MONGODB_URI }}" },
+                  { "name": "NEXTAUTH_SECRET", "secureValue": "${{ secrets.NEXTAUTH_SECRET }}" }
+                ]
+              },
+              {
+                "name": "nginx",
+                "image": "nginx:alpine",
+                "resources": { "requests": { "cpu": 0.2, "memoryInGb": 0.3 } },
+                "ports": [{ "port": 80 }, { "port": 443 }],
+                "volumeMounts": [
+                  { "name": "nginx-config", "mountPath": "/etc/nginx/nginx.conf", "readOnly": true },
+                  { "name": "nginx-certs", "mountPath": "/etc/nginx/certs", "readOnly": true }
+                ]
+              }
+            ]' \
+            --volumes '[
+              {
+                "name": "nginx-config",
+                "secret": {
+                  "nginx.conf": "'$(base64 -w0 nginx/nginx.conf)'"
+                }
+              },
+              {
+                "name": "nginx-certs",
+                "secret": {
+                  "tls.crt": "'$TLS_CERT'",
+                  "tls.key": "'$TLS_KEY'"
+                }
+              }
+            ]'

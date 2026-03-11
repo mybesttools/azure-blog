@@ -1,5 +1,5 @@
 import Container from "@/app/_components/container";
-import { EXAMPLE_PATH } from "@/lib/constants";
+import Script from "next/script";
 
 export function Footer() {
   return (
@@ -16,6 +16,9 @@ export function Footer() {
             >
               Visit My Github
             </a>
+            <span id="siteseal" className="mx-3">
+              <Script async strategy="lazyOnload" src="https://seal.godaddy.com/getSealBasic?sealID=npsDjpzTVoHfOOrHMVGBFkCTsMGywL4X5nyAH0OMSeeLIQurtM" />
+            </span>
           </div>
         </div>
       </Container>
