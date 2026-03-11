@@ -1,0 +1,25 @@
+name: Deploy .net Redirect Site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'redirect/**'
+      - '.github/workflows/deploy-redirect.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.NET_REDIRECT_DEPLOY_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: redirect
+          skip_app_build: true
