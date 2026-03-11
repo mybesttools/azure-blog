@@ -215,7 +215,7 @@ const MediaCreate = () => (
         source="file" 
         label="File" 
         accept={{ 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] }}
-        required
+        isRequired
       >
         <FileField source="src" title="title" />
       </FileInput>
