@@ -56,7 +56,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               return null;
             }
 
-            const isValidMfa = await totp.verify(mfaToken);
+            const isValidMfa = await totp.verify({ token: mfaToken, secret: user.mfaSecret });
 
             if (!isValidMfa) {
               return null;
