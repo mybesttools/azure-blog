@@ -39,7 +39,7 @@ export default function MarkdownEditor({ value, onChange }: MarkdownEditorProps)
       'fullscreen',
       '|',
       'guide'
-    ],
+    ] as const,
     previewRender: (text: string) => {
       // Use a simple but more accurate markdown preview
       // This will be client-side only, matching closer to what remark produces

@@ -235,7 +235,7 @@ const CustomMenu = () => (
       to="/admin/mfa"
       primaryText="MFA Settings"
       leftIcon={<span>🔐</span>}
-      onClick={(e) => {
+      onClick={(e: React.MouseEvent) => {
         e.preventDefault();
         window.open('/admin/mfa', '_blank');
       }}
