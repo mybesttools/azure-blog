@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Verify token
     const totp = new TOTP({ 
-      secret: user.mfaSecret,
+      secret: user.mfaSecret!,
       crypto: new NobleCryptoPlugin(),
       base32: new ScureBase32Plugin(),
     });
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
     }
 
-    const isValid = await totp.verify({ token: tokenValue, secret: user.mfaSecret });
+    const isValid = await totp.verify(tokenValue);
     
     console.log('Verifying MFA token:', { token, secretLength: user.mfaSecret?.length, isValid });
 
