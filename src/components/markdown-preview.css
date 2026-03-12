@@ -1,3 +1,50 @@
+/* Restore EasyMDE toolbar button styles reset by Tailwind preflight */
+.editor-toolbar {
+  padding: 9px 10px !important;
+  line-height: normal !important;
+}
+
+.editor-toolbar button {
+  display: inline-block !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 6px !important;
+  margin: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  background: none !important;
+  font-weight: bold !important;
+  line-height: 30px !important;
+  color: #333 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  vertical-align: middle !important;
+}
+
+.editor-toolbar button:hover,
+.editor-toolbar button.active {
+  background: #fcfcfc !important;
+  border-color: #95a5a6 !important;
+  color: #333 !important;
+}
+
+.editor-toolbar button i,
+.editor-toolbar button i::before {
+  color: #333 !important;
+}
+
+.editor-toolbar i.separator {
+  display: inline-block !important;
+  width: 0 !important;
+  border-left: 1px solid #d9d9d9 !important;
+  border-right: 1px solid #fff !important;
+  color: transparent !important;
+  text-indent: -10px !important;
+  margin: 0 6px !important;
+}
+
 /* Custom SimpleMDE preview styles to match frontend */
 .editor-preview,
 .editor-preview-side {
