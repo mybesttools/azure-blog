@@ -1,9 +1,5 @@
 {
-  "routes": [
-    {
-      "route": "/*",
-      "redirect": "https://www.mybesttools.com",
-      "statusCode": 301
-    }
-  ]
+  "navigationFallback": {
+    "rewrite": "/index.html"
+  }
 }
