@@ -5,6 +5,9 @@ import { getSession } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
+// Allow up to 60 seconds for upload processing
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   try {
     await connectDB();

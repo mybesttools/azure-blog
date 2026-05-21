@@ -30,6 +30,27 @@
 
 The application is currently stable with no blocking issues.
 
+## Production Deployment Considerations
+
+### File Upload Size Limits (RESOLVED)
+**Issue:** File uploads larger than 1MB failed in production with HTML error responses.  
+**Cause:** nginx default `client_max_body_size` limit of 1MB  
+**Resolution:** Added `client_max_body_size 50M;` to nginx.conf and `maxDuration = 60` to media route
+
+### Ephemeral File Storage (⚠️ LIMITATION)
+**Issue:** Uploaded media files are stored in the container filesystem at `/app/public/uploads`  
+**Impact:** Files are lost when the container restarts or is redeployed  
+**Workaround Options:**
+1. **Azure Blob Storage** (recommended) - Use `@azure/storage-blob` to store media in persistent blob storage
+2. **Azure Files** - Mount an Azure File Share to the container for persistent storage
+3. **Database storage** - Store small files directly in MongoDB as base64 (not recommended for large files)
+
+**To implement Azure Blob Storage:**
+```bash
+npm install @azure/storage-blob
+```
+Then modify `src/app/api/media/route.ts` to upload to Blob Storage instead of local filesystem.
+
 1. **Use the API directly** - Payload exposes REST and GraphQL APIs
 2. **Direct MongoDB access** - Use MongoDB Compass or mongosh to manage data
 3. **Wait for fix** - Payload team is aware and working on React 19 compatibility
