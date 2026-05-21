@@ -61,11 +61,13 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const fileEntry = formData.get('file');
     
-    if (!file) {
+    if (!(fileEntry instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
+
+    const file = fileEntry;
 
     // Create uploads directory if it doesn't exist
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');

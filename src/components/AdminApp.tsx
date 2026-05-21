@@ -41,14 +41,48 @@ const httpClient = (url: string, options: any = {}) => {
 
 const baseDataProvider = simpleRestProvider('/api', httpClient);
 
+const getUploadFile = (value: any): File | null => {
+  const fileValue = Array.isArray(value) ? value[0] : value;
+
+  if (!fileValue) {
+    return null;
+  }
+
+  return fileValue.rawFile instanceof File ? fileValue.rawFile : null;
+};
+
+const getResponseError = async (response: Response): Promise<string> => {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const errorBody = await response.json();
+    return errorBody.error || 'Upload failed';
+  }
+
+  const errorText = await response.text();
+  const trimmedText = errorText.replace(/\s+/g, ' ').trim();
+
+  if (trimmedText.startsWith('<')) {
+    return 'Upload failed because the server returned HTML instead of JSON. Check that your admin session is still valid and review the server logs for the underlying error.';
+  }
+
+  return trimmedText || 'Upload failed';
+};
+
 // Custom data provider to handle file uploads for media
 const dataProvider = {
   ...baseDataProvider,
   create: (resource: string, params: any) => {
     if (resource === 'media' && params.data.file) {
+      const uploadFile = getUploadFile(params.data.file);
+
+      if (!uploadFile) {
+        return Promise.reject(new Error('Select a file before uploading.'));
+      }
+
       // Handle file upload
       const formData = new FormData();
-      formData.append('file', params.data.file.rawFile);
+      formData.append('file', uploadFile);
       if (params.data.alt) {
         formData.append('alt', params.data.alt);
       }
@@ -60,12 +94,11 @@ const dataProvider = {
         body: formData,
         // Important: Do NOT set Content-Type header for FormData
       })
-        .then(response => {
+        .then(async response => {
           if (!response.ok) {
-            return response.json().then(err => {
-              throw new Error(err.error || 'Upload failed');
-            });
+            throw new Error(await getResponseError(response));
           }
+
           return response.json();
         })
         .then(data => ({ data }))
