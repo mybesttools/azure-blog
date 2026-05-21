@@ -8,6 +8,7 @@ export interface IMedia extends Document {
   height?: number;
   url: string;
   alt?: string;
+  data?: string; // Base64 encoded file data for MongoDB storage
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,9 @@ const MediaSchema = new Schema<IMedia>(
     },
     alt: {
       type: String,
+    },
+    data: {
+      type: String, // Base64 encoded image data
     },
   },
   {

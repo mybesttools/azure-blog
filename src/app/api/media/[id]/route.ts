@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Media from '@/models/Media';
 import { getSession } from '@/lib/auth';
-import { unlink } from 'fs/promises';
-import path from 'path';
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +17,9 @@ export async function GET(
       return NextResponse.json({ error: 'Media not found' }, { status: 404 });
     }
     
-    return NextResponse.json({ ...media, id: media._id.toString() });
+    // Don't send base64 data in JSON responses (too large)
+    const { data, ...mediaWithoutData } = media;
+    return NextResponse.json({ ...mediaWithoutData, id: media._id.toString() });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -76,17 +76,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Media not found' }, { status: 404 });
     }
     
-    // Delete the file from disk
-    try {
-      const filePath = path.join(process.cwd(), 'public', media.url);
-      await unlink(filePath);
-    } catch (err) {
-      console.error('Failed to delete file:', err);
-    }
-    
+    // Delete from database (no physical file to delete)
     await Media.findByIdAndDelete(id);
     
-    return NextResponse.json({ ...media, id: media._id.toString() });
+    const { data, ...mediaWithoutData } = media;
+    return NextResponse.json({ ...mediaWithoutData, id: media._id.toString() });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

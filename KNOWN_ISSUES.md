@@ -32,12 +32,29 @@ The application is currently stable with no blocking issues.
 
 ## Production Deployment Considerations
 
-### File Upload Size Limits (RESOLVED)
-**Issue:** File uploads larger than 1MB failed in production with HTML error responses.  
-**Cause:** nginx default `client_max_body_size` limit of 1MB  
-**Resolution:** Added `client_max_body_size 50M;` to nginx.conf and `maxDuration = 60` to media route
+### File Upload Storage (✅ SOLVED)
+**Solution:** Images stored as base64 in MongoDB  
+**Implementation:** Media files up to 10MB are stored directly in the MongoDB Media collection
 
-### Ephemeral File Storage (⚠️ LIMITATION)
+**Benefits:**
+- ✅ Images survive container restarts and redeployments
+- ✅ No additional Azure storage costs
+- ✅ Simple architecture - one database for everything
+- ✅ Automatic backups with MongoDB backups
+
+**Limitations:**
+- Maximum file size: 10MB (MongoDB 16MB document limit)
+- Not ideal for very high-traffic sites (consider CDN for that scale)
+
+**How it works:**
+1. Upload via admin → File converted to base64 → Stored in MongoDB
+2. Access at `/api/media/filename.png` → Fetched from MongoDB → Served as image
+
+### Legacy Information (No Longer Applicable)
+
+The following sections describe old approaches that are no longer used:
+
+**Ephemeral File Storage (OLD - Not Used):**
 **Issue:** Uploaded media files are stored in the container filesystem at `/app/public/uploads`  
 **Impact:** Files are lost when the container restarts or is redeployed  
 **Workaround Options:**
@@ -47,6 +64,18 @@ The application is currently stable with no blocking issues.
 
 **To implement Azure Blob Storage:**
 ```bash
+---
+
+## Current Implementation (MongoDB Storage)
+
+As of the latest version, uploaded media is stored directly in MongoDB as base64-encoded data. This provides:
+- Persistence across deployments
+- No additional storage costs
+- Simple architecture
+- Automatic backup with database backups
+
+Files are served via `/api/media/[filename]` which fetches from MongoDB and returns the binary data with proper content-type headers.
+
 npm install @azure/storage-blob
 ```
 Then modify `src/app/api/media/route.ts` to upload to Blob Storage instead of local filesystem.

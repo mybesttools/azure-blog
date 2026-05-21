@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Media from '@/models/Media';
 import { getSession } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 
 // Allow up to 60 seconds for upload processing
 export const maxDuration = 60;
@@ -25,7 +23,9 @@ export async function GET(request: Request) {
       if (!media) {
         return NextResponse.json({ error: 'Media not found' }, { status: 404 });
       }
-      return NextResponse.json({ ...media, id: media._id.toString() });
+      // Don't send base64 data in JSON responses
+      const { data, ...mediaWithoutData } = media;
+      return NextResponse.json({ ...mediaWithoutData, id: media._id.toString() });
     }
 
     // Get total count
@@ -38,11 +38,14 @@ export async function GET(request: Request) {
       .limit(_end - _start)
       .lean();
 
-    // Transform _id to id for React Admin
-    const transformedMedia = mediaFiles.map(media => ({
-      ...media,
-      id: media._id.toString(),
-    }));
+    // Transform _id to id for React Admin and remove base64 data
+    const transformedMedia = mediaFiles.map(media => {
+      const { data, ...mediaWithoutData } = media;
+      return {
+        ...mediaWithoutData,
+        id: media._id.toString(),
+      };
+    });
 
     return NextResponse.json(transformedMedia, {
       headers: {
@@ -72,31 +75,34 @@ export async function POST(request: NextRequest) {
 
     const file = fileEntry;
 
-    // Create uploads directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
+    // Check file size (limit to 10MB for MongoDB storage)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large. Maximum size is 10MB.' }, { status: 400 });
+    }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const filename = `${timestamp}-${file.name}`;
-    const filepath = path.join(uploadDir, filename);
-
-    // Write file
+    // Convert file to base64 for MongoDB storage
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+    const base64Data = buffer.toString('base64');
 
-    // Create media record
+    // Generate unique filename for the URL
+    const timestamp = Date.now();
+    const filename = `${timestamp}-${file.name}`;
+
+    // Create media record with embedded file data
     const media = await Media.create({
       filename: file.name,
       mimeType: file.type,
       filesize: file.size,
-      url: `/uploads/${filename}`,
+      url: `/api/media/${filename}`, // URL will serve from database
       alt: formData.get('alt') || '',
+      data: base64Data, // Store the actual file in MongoDB
     });
 
     const mediaObj = media.toObject();
-    return NextResponse.json({ ...mediaObj, id: mediaObj._id.toString() }, { status: 201 });
+    // Don't send the base64 data back in the response (too large)
+    const { data, ...responseObj } = mediaObj;
+    return NextResponse.json({ ...responseObj, id: mediaObj._id.toString() }, { status: 201 });
   } catch (error: any) {
     console.error('Media upload error:', error);
     return NextResponse.json({ error: error.message || 'Upload failed' }, { status: 500 });
