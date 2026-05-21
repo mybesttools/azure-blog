@@ -13,7 +13,7 @@ export async function GET(
     // Extract the original filename from the timestamped name
     // Format: timestamp-originalname.ext
     const media = await Media.findOne({
-      url: `/api/media/${filename}`
+      url: `/api/images/${filename}`
     }).lean();
     
     if (!media || !media.data) {

@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       filename: file.name,
       mimeType: file.type,
       filesize: file.size,
-      url: `/api/media/${filename}`, // URL will serve from database
+      url: `/api/images/${filename}`, // URL will serve from database
       alt: formData.get('alt') || '',
       data: base64Data, // Store the actual file in MongoDB
     });
