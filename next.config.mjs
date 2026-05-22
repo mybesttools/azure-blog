@@ -10,6 +10,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: '*.azurewebsites.net',
       },
+      {
+        protocol: 'https',
+        hostname: 'cdn.shopify.com',
+      },
     ],
   },
   output: 'standalone',

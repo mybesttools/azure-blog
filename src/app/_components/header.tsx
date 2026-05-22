@@ -63,6 +63,11 @@ const Header = () => {
               </li>
             </ul>
           </li>
+          <li>
+            <Link href="/shop" className="hover:underline">
+              Shop
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>
