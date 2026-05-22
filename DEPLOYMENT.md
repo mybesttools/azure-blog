@@ -54,12 +54,26 @@ az acr create \
 # Login to ACR
 az acr login --name yourblogacr
 
-# Build the image
-docker build -t yourblogacr.azurecr.io/azure-blog:latest .
+# Build the image with environment variables for Shopify integration
+# Option 1: Use the build script (recommended)
+./docker-build.sh
+
+# Tag for ACR
+docker tag azure-blog:latest yourblogacr.azurecr.io/azure-blog:latest
+
+# Option 2: Manual build with build args
+docker build \
+  --build-arg NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN="your-store.myshopify.com" \
+  --build-arg NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN="your_token_here" \
+  --build-arg NEXT_PUBLIC_SITE_URL="https://yourdomain.com" \
+  -t yourblogacr.azurecr.io/azure-blog:latest \
+  .
 
 # Push to ACR
 docker push yourblogacr.azurecr.io/azure-blog:latest
 ```
+
+**Important**: The Shopify environment variables must be provided at **build time** because Next.js embeds `NEXT_PUBLIC_*` variables into the client bundle during the build process.
 
 ### 3. Deploy to Azure Container Instances
 

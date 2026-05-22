@@ -1,20 +1,28 @@
 import { createStorefrontClient } from '@shopify/hydrogen-react';
 
-// Initialize Shopify Storefront API client
-export const shopifyClient = createStorefrontClient({
-  storeDomain: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || '',
-  storefrontApiVersion: '2024-10', // Updated to latest stable version
-  publicStorefrontToken: process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN || '',
-});
+// Check if Shopify is configured
+const isShopifyConfigured = () => {
+  return !!(process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN && process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN);
+};
+
+// Initialize Shopify Storefront API client with safe defaults
+export const shopifyClient = isShopifyConfigured() 
+  ? createStorefrontClient({
+      storeDomain: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN!,
+      storefrontApiVersion: '2024-10',
+      publicStorefrontToken: process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN!,
+    })
+  : null;
 
 // Debug: Log configuration (only in development)
 if (process.env.NODE_ENV === 'development') {
   console.log('Shopify Config:', {
+    configured: isShopifyConfigured(),
     storeDomain: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN,
     apiVersion: '2024-10',
     hasToken: !!process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN,
     tokenPrefix: process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN?.substring(0, 6),
-    apiUrl: shopifyClient.getStorefrontApiUrl(),
+    apiUrl: shopifyClient?.getStorefrontApiUrl(),
   });
 }
 
@@ -122,6 +130,12 @@ export interface ShopifyProduct {
 
 // Fetch multiple products
 export async function getProducts(limit: number = 10): Promise<ShopifyProduct[]> {
+  // Return empty array if Shopify is not configured
+  if (!shopifyClient) {
+    console.warn('Shopify is not configured. Please set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN and NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN');
+    return [];
+  }
+
   try {
     const headers = shopifyClient.getPublicTokenHeaders();
     const url = shopifyClient.getStorefrontApiUrl();
@@ -182,6 +196,12 @@ export async function getProducts(limit: number = 10): Promise<ShopifyProduct[]>
 
 // Fetch a single product by handle
 export async function getProductByHandle(handle: string): Promise<ShopifyProduct | null> {
+  // Return null if Shopify is not configured
+  if (!shopifyClient) {
+    console.warn('Shopify is not configured. Please set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN and NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN');
+    return null;
+  }
+
   try {
     const response = await fetch(shopifyClient.getStorefrontApiUrl(), {
       method: 'POST',

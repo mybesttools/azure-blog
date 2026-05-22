@@ -1,9 +1,20 @@
 import { MetadataRoute } from 'next';
 import { getAllPosts } from '@/lib/api';
 
+// Make this dynamic to avoid build-time database connection
+export const dynamic = 'force-dynamic';
+export const revalidate = 3600; // Revalidate every hour
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const posts = await getAllPosts();
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
+
+  // Try to get posts, but handle if database is not available
+  let posts: any[] = [];
+  try {
+    posts = await getAllPosts();
+  } catch (error) {
+    console.warn('Could not fetch posts for sitemap:', error);
+  }
 
   // Map blog posts to sitemap entries
   const postEntries: MetadataRoute.Sitemap = posts.map((post) => ({
