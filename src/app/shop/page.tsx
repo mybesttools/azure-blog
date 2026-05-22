@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   
   return {
     title: 'Shop Best Tools & Products | My Best Tools',
-    description: `Discover our curated collection of premium tools and products. ${products.length > 0 ? `Browse ${productNames} and more.` : 'Quality products for developers and creators.'} Free shipping on orders over $50.`,
-    keywords: ['tools', 'products', 'shop', 'online store', 'buy tools', 'developer tools', 'best tools'],
+    description: `Discover our curated collection of premium tools and products. ${products.length > 0 ? `Browse ${productNames} and more.` : 'Quality products for developers and creators.'} Shipping worldwide from Amsterdam.`,
+    keywords: ['tools', 'products', 'shop', 'online store', 'buy tools', 'developer tools', 'best tools', 'Amsterdam'],
     authors: [{ name: 'My Best Tools' }],
     openGraph: {
       title: 'Shop Best Tools & Products',
@@ -61,7 +61,7 @@ export default async function ShopPage() {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: 'Shop Premium Tools & Products',
-    description: 'Discover our hand-picked collection of high-quality tools and products for developers and creators.',
+    description: 'Discover our hand-picked collection of high-quality tools and products for developers and creators. Shipping worldwide from Amsterdam.',
     url: `${baseUrl}/shop`,
     mainEntity: {
       '@type': 'ItemList',
@@ -101,8 +101,8 @@ export default async function ShopPage() {
           </h1>
           <p className="text-lg md:text-xl mb-12 text-gray-700 dark:text-gray-300 max-w-3xl">
             Discover our hand-picked collection of high-quality tools and products. 
-            {products.length > 0 && ` Browse ${products.length} premium items, `}
-            Perfect for developers, creators, and professionals. Free shipping on orders over $50.
+            {products.length > 0 && ` Browse ${products.length} premium items. `}
+            Perfect for developers, creators, and professionals. Shipping worldwide from Amsterdam.
           </p>
           
           {products.length > 0 ? (
