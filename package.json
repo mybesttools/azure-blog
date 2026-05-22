@@ -5,11 +5,13 @@
     "build": "next build",
     "start": "next start",
     "migrate": "tsx scripts/migrate-posts.ts",
-    "create-admin": "tsx scripts/create-admin.ts"
+    "create-admin": "tsx scripts/create-admin.ts",
+    "fix-tabs": "node scripts/fix-tab-characters.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@giscus/react": "^2.4.0",
+    "@shopify/hydrogen-react": "^2026.4.2",
     "@types/qrcode": "^1.5.6",
     "bcryptjs": "^2.4.3",
     "classnames": "^2.5.1",

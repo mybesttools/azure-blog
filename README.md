@@ -5,11 +5,12 @@ A modern blog powered by Next.js and Payload CMS, designed for deployment on low
 ## Features
 
 - **Server-Side Rendering**: Dynamic content served from a headless CMS
-- **Payload CMS**: Powerful, self-hosted content management system with admin panel
-- **MongoDB**: Flexible document database for content storage
-- **Docker Support**: Containerized for easy deployment
+- **React Admin CMS**: Powerful admin panel with MongoDB backend for managing posts, users, and media
+- **MongoDB Storage**: Flexible document database with base64 image storage (no filesystem dependencies)
+- **Shopify Integration**: Headless e-commerce with Storefront API for native product display
+- **Docker Support**: Containerized with standalone output for easy deployment
 - **Azure Ready**: Optimized for Azure Container Instances (recommended), App Service, and Container Apps
-- **Low Cost**: Starting from ~$15-20/month with MongoDB Atlas free tier
+- **Low Cost**: Starting from ~$15/month with MongoDB Atlas free tier
 
 ## Getting Started
 
@@ -115,11 +116,37 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Azure deployment instructions 
 
 ## Technologies
 
-- [Next.js 15](https://nextjs.org/) - React framework
-- [Payload CMS](https://payloadcms.com/) - Headless CMS
-- [MongoDB](https://www.mongodb.com/) - Database
+- [Next.js 15](https://nextjs.org/) - React framework with App Router
+- [React Admin](https://marmelab.com/react-admin/) - Admin panel framework
+- [MongoDB](https://www.mongodb.com/) - NoSQL database with Mongoose ODM
+- [NextAuth.js](https://next-auth.js.org/) - Authentication for admin access
+- [Shopify Storefront API](https://shopify.dev/docs/api/storefront) - Headless e-commerce integration
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 - [Tailwind CSS](https://tailwindcss.com) - Styling
+
+## Shopify Integration
+
+This blog supports native product display using Shopify's Storefront API. See [SHOPIFY_SETUP.md](./SHOPIFY_SETUP.md) for complete setup instructions.
+
+**Quick Start:**
+
+1. Create a Shopify development store (free)
+2. Enable Storefront API access
+3. Add environment variables:
+   ```bash
+   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+   NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN=shpat_xxx
+   ```
+4. Use components in your blog posts:
+   ```typescript
+   import { getProducts } from '@/lib/shopify';
+   import { ProductGrid } from '@/components/ShopifyProducts';
+   
+   const products = await getProducts(3);
+   return <ProductGrid products={products} />;
+   ```
+
+See the [blog post](_posts/shopify-integration.md) for implementation details.
 
 ## License
 
