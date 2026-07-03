@@ -14,6 +14,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'cdn.shopify.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.mybesttools.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'mybesttools.com',
+      },
     ],
   },
   output: 'standalone',

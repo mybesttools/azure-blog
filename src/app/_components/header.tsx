@@ -1,13 +1,18 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const Header = () => {
   return (
     <header className="mb-14 mt-8 flex items-center justify-between">
-      <Link
-        href="/"
-        className="text-2xl md:text-4xl font-bold tracking-tight md:tracking-tighter leading-tight hover:underline"
-      >
-        Blog
+      <Link href="/" className="flex items-center">
+        <Image
+          src="/assets/logo.png"
+          alt="MyBestTools"
+          width={48}
+          height={48}
+          priority
+        />
+        <span className="sr-only">MyBestTools</span>
       </Link>
       <nav aria-label="Main" className="text-sm md:text-base font-medium">
         <ul className="flex items-center gap-6">
