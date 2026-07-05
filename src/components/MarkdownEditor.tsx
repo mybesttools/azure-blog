@@ -21,6 +21,7 @@ export default function MarkdownEditor({ value, onChange }: MarkdownEditorProps)
     status: false,
     minHeight: '400px',
     initialValue: '',
+    promptURLs: true,
     toolbar: [
       'bold', 
       'italic', 
@@ -107,6 +108,7 @@ export default function MarkdownEditor({ value, onChange }: MarkdownEditorProps)
           let processed = line
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
             .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
           html += `<p>${processed}</p>`;
         } else {
