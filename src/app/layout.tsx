@@ -1,5 +1,5 @@
 import Footer from "@/app/_components/footer";
-import { CMS_NAME, HOME_OG_IMAGE_URL } from "@/lib/constants";
+import { HOME_OG_IMAGE_URL } from "@/lib/constants";
 import type { Metadata } from "next";
 import cn from "classnames";
 import { ThemeSwitcher } from "./_components/theme-switcher";
@@ -9,8 +9,8 @@ import * as React from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: `Next.js Blog with ${CMS_NAME}`,
-  description: `A server-side blog using Next.js, Payload CMS and ${CMS_NAME}.`,
+  title: `MyBestTools. Blog!`,
+  description: `The MyBestTools blog.`,
   openGraph: {
     images: [HOME_OG_IMAGE_URL],
   },
