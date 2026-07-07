@@ -61,6 +61,7 @@ jobs:
           NEXT_PUBLIC_GITHUB_REPO: ${{ secrets.NEXT_PUBLIC_GITHUB_REPO }}
           NEXT_PUBLIC_GISCUS_REPO_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}
           NEXT_PUBLIC_GISCUS_CATEGORY_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
+          GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
           AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
           ACI_DNS_NAME: ${{ secrets.ACI_DNS_NAME }}
           IMAGE_TAG: ${{ github.sha }}
@@ -92,6 +93,7 @@ jobs:
               "githubRepo":          { "type": "string" },
               "giscusRepoId":        { "type": "string" },
               "giscusCategoryId":    { "type": "string" },
+              "gaMeasurementId":     { "type": "string" },
               "nginxConfB64":        { "type": "string" },
               "tlsCertB64":          { "type": "string" },
               "tlsKeyB64":           { "type": "securestring" },
@@ -117,6 +119,7 @@ jobs:
                           { "name": "NEXT_PUBLIC_GITHUB_REPO",      "value":       "[parameters('githubRepo')]" },
                           { "name": "NEXT_PUBLIC_GISCUS_REPO_ID",   "value":       "[parameters('giscusRepoId')]" },
                           { "name": "NEXT_PUBLIC_GISCUS_CATEGORY_ID","value":      "[parameters('giscusCategoryId')]" },
+                          { "name": "GA_MEASUREMENT_ID",             "value":      "[parameters('gaMeasurementId')]" },
                           { "name": "MONGODB_URI",                  "secureValue": "[parameters('mongodbUri')]" },
                           { "name": "NEXTAUTH_SECRET",              "secureValue": "[parameters('nextauthSecret')]" }
                         ]
@@ -192,6 +195,7 @@ jobs:
               "githubRepo":       {"value": os.environ["NEXT_PUBLIC_GITHUB_REPO"]},
               "giscusRepoId":     {"value": os.environ["NEXT_PUBLIC_GISCUS_REPO_ID"]},
               "giscusCategoryId": {"value": os.environ["NEXT_PUBLIC_GISCUS_CATEGORY_ID"]},
+              "gaMeasurementId":  {"value": os.environ.get("GA_MEASUREMENT_ID", "")},
               "nginxConfB64":     {"value": os.environ["NGINX_CONF_B64"]},
               "tlsCertB64":       {"value": os.environ["TLS_CERT_B64"]},
               "tlsKeyB64":        {"value": os.environ["TLS_KEY_B64"]},

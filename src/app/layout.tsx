@@ -2,6 +2,7 @@ import Footer from "@/app/_components/footer";
 import { HOME_OG_IMAGE_URL } from "@/lib/constants";
 import type { Metadata } from "next";
 import cn from "classnames";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeSwitcher } from "./_components/theme-switcher";
 import { ThemeProvider } from "./_components/theme-provider";
 import * as React from "react";
@@ -65,6 +66,9 @@ export default function RootLayout({
           <div className="min-h-screen">{children}</div>
           <Footer />
         </ThemeProvider>
+        {process.env.GA_MEASUREMENT_ID && (
+          <GoogleAnalytics gaId={process.env.GA_MEASUREMENT_ID} />
+        )}
       </body>
     </html>
   );
