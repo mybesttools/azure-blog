@@ -1,7 +1,7 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
-import { useState, FormEvent } from 'react';
+import { signIn, getProviders } from 'next-auth/react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -11,7 +11,18 @@ export default function LoginPage() {
   const [requireMfa, setRequireMfa] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSso, setCheckingSso] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    getProviders().then((providers) => {
+      if (providers?.['azure-ad']) {
+        signIn('azure-ad', { callbackUrl: '/admin' });
+      } else {
+        setCheckingSso(false);
+      }
+    });
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,6 +93,14 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (checkingSso) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Redirecting to sign-in...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
