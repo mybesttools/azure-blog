@@ -12,6 +12,7 @@ export interface IPost extends Document {
   };
   slug: string;
   status: 'draft' | 'published';
+  category?: mongoose.Types.ObjectId; // Reference to Category
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +56,10 @@ const PostSchema = new Schema<IPost>(
       type: String,
       enum: ['draft', 'published'],
       default: 'draft',
+    },
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
     },
   },
   {

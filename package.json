@@ -6,6 +6,7 @@
     "start": "next start",
     "migrate": "tsx scripts/migrate-posts.ts",
     "create-admin": "tsx scripts/create-admin.ts",
+    "seed-categories": "tsx scripts/seed-categories.ts",
     "fix-tabs": "node scripts/fix-tab-characters.js"
   },
   "dependencies": {

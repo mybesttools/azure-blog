@@ -21,6 +21,11 @@ import {
   Layout,
   Menu,
   MenuItemLink,
+  NumberInput,
+  BooleanInput,
+  BooleanField,
+  NumberField,
+  ReferenceInput,
 } from 'react-admin';
 import simpleRestProvider from 'ra-data-simple-rest';
 import { useSession } from 'next-auth/react';
@@ -165,6 +170,9 @@ const PostEdit = () => (
         { id: 'draft', name: 'Draft' },
         { id: 'published', name: 'Published' },
       ]} />
+      <ReferenceInput source="category" reference="categories" label="Category">
+        <SelectInput optionText="name" />
+      </ReferenceInput>
       <DateInput source="date" />
       <TextInput source="coverImage" fullWidth label="Cover Image URL" />
       <TextInput source="author.name" fullWidth label="Author Name" />
@@ -192,6 +200,9 @@ const PostCreate = () => (
         { id: 'draft', name: 'Draft' },
         { id: 'published', name: 'Published' },
       ]} />
+      <ReferenceInput source="category" reference="categories" label="Category">
+        <SelectInput optionText="name" />
+      </ReferenceInput>
       <DateInput source="date" />
       <TextInput source="coverImage" fullWidth label="Cover Image URL" />
       <TextInput source="author.name" fullWidth label="Author Name" />
@@ -230,6 +241,42 @@ const UserCreate = () => (
   </Create>
 );
 
+const CategoryList = () => (
+  <List>
+    <Datagrid rowClick="edit">
+      <TextField source="name" />
+      <TextField source="slug" />
+      <NumberField source="order" />
+      <BooleanField source="isDefault" />
+      <DateField source="createdAt" />
+    </Datagrid>
+  </List>
+);
+
+const CategoryEdit = () => (
+  <Edit>
+    <SimpleForm>
+      <TextInput source="name" fullWidth required />
+      <TextInput source="slug" fullWidth required helperText="URL-friendly version (e.g., about-azure)" />
+      <TextInput source="description" fullWidth multiline rows={3} />
+      <NumberInput source="order" helperText="Lower numbers appear first in navigation" />
+      <BooleanInput source="isDefault" label="Set as default category" />
+    </SimpleForm>
+  </Edit>
+);
+
+const CategoryCreate = () => (
+  <Create>
+    <SimpleForm defaultValues={{ order: 0, isDefault: false }}>
+      <TextInput source="name" fullWidth required />
+      <TextInput source="slug" fullWidth required helperText="URL-friendly version (e.g., about-azure)" />
+      <TextInput source="description" fullWidth multiline rows={3} />
+      <NumberInput source="order" helperText="Lower numbers appear first in navigation" />
+      <BooleanInput source="isDefault" label="Set as default category" />
+    </SimpleForm>
+  </Create>
+);
+
 const MediaList = () => (
   <List>
     <Datagrid rowClick="edit">
@@ -262,6 +309,7 @@ const CustomMenu = () => (
   <Menu>
     <Menu.DashboardItem />
     <Menu.ResourceItem name="posts" />
+    <Menu.ResourceItem name="categories" />
     <Menu.ResourceItem name="users" />
     <Menu.ResourceItem name="media" />
     <MenuItemLink
@@ -304,6 +352,7 @@ export default function AdminApp() {
   return (
     <Admin dataProvider={dataProvider} layout={CustomLayout}>
       <Resource name="posts" list={PostList} edit={PostEdit} create={PostCreate} />
+      <Resource name="categories" list={CategoryList} edit={CategoryEdit} create={CategoryCreate} />
       <Resource name="users" list={UserList} edit={UserEdit} create={UserCreate} />
       <Resource name="media" list={MediaList} create={MediaCreate} />
     </Admin>
