@@ -1,0 +1,41 @@
+name: Backup MongoDB
+
+on:
+  schedule:
+    # Daily at 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    name: Backup
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+    steps:
+      - name: Dump database
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_ENV"
+          docker run --rm -e MONGODB_URI -v "$PWD:/dump" mongo:7 \
+            sh -c 'mongodump --uri="$MONGODB_URI" --archive=/dump/backup.gz --gzip'
+          mv backup.gz "backup-$TIMESTAMP.gz"
+
+      - name: Push to backup repo, keeping only the 4 most recent
+        run: |
+          git clone --depth 1 "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/mybesttools/azure-blog-backups.git" backup-repo
+          mkdir -p backup-repo/backups
+          mv "backup-$TIMESTAMP.gz" "backup-repo/backups/backup-$TIMESTAMP.gz"
+
+          cd backup-repo/backups
+          ls -1t | tail -n +5 | xargs -r rm --
+          cd ..
+
+          git -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              add backups
+          git -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -m "Backup $TIMESTAMP" --allow-empty
+          git push origin main
