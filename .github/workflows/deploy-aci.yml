@@ -62,6 +62,9 @@ jobs:
           NEXT_PUBLIC_GISCUS_REPO_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_REPO_ID }}
           NEXT_PUBLIC_GISCUS_CATEGORY_ID: ${{ secrets.NEXT_PUBLIC_GISCUS_CATEGORY_ID }}
           GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+          AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+          AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
           AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
           ACI_DNS_NAME: ${{ secrets.ACI_DNS_NAME }}
           IMAGE_TAG: ${{ github.sha }}
@@ -94,6 +97,9 @@ jobs:
               "giscusRepoId":        { "type": "string" },
               "giscusCategoryId":    { "type": "string" },
               "gaMeasurementId":     { "type": "string" },
+              "azureAdClientId":     { "type": "string" },
+              "azureAdClientSecret": { "type": "securestring" },
+              "azureAdTenantId":     { "type": "string" },
               "nginxConfB64":        { "type": "string" },
               "tlsCertB64":          { "type": "string" },
               "tlsKeyB64":           { "type": "securestring" },
@@ -120,8 +126,11 @@ jobs:
                           { "name": "NEXT_PUBLIC_GISCUS_REPO_ID",   "value":       "[parameters('giscusRepoId')]" },
                           { "name": "NEXT_PUBLIC_GISCUS_CATEGORY_ID","value":      "[parameters('giscusCategoryId')]" },
                           { "name": "GA_MEASUREMENT_ID",             "value":      "[parameters('gaMeasurementId')]" },
+                          { "name": "AZURE_AD_CLIENT_ID",            "value":      "[parameters('azureAdClientId')]" },
+                          { "name": "AZURE_AD_TENANT_ID",            "value":      "[parameters('azureAdTenantId')]" },
                           { "name": "MONGODB_URI",                  "secureValue": "[parameters('mongodbUri')]" },
-                          { "name": "NEXTAUTH_SECRET",              "secureValue": "[parameters('nextauthSecret')]" }
+                          { "name": "NEXTAUTH_SECRET",              "secureValue": "[parameters('nextauthSecret')]" },
+                          { "name": "AZURE_AD_CLIENT_SECRET",       "secureValue": "[parameters('azureAdClientSecret')]" }
                         ]
                       }
                     },
@@ -196,6 +205,9 @@ jobs:
               "giscusRepoId":     {"value": os.environ["NEXT_PUBLIC_GISCUS_REPO_ID"]},
               "giscusCategoryId": {"value": os.environ["NEXT_PUBLIC_GISCUS_CATEGORY_ID"]},
               "gaMeasurementId":  {"value": os.environ.get("GA_MEASUREMENT_ID", "")},
+              "azureAdClientId":     {"value": os.environ.get("AZURE_AD_CLIENT_ID", "")},
+              "azureAdClientSecret": {"value": os.environ.get("AZURE_AD_CLIENT_SECRET", "")},
+              "azureAdTenantId":     {"value": os.environ.get("AZURE_AD_TENANT_ID", "")},
               "nginxConfB64":     {"value": os.environ["NGINX_CONF_B64"]},
               "tlsCertB64":       {"value": os.environ["TLS_CERT_B64"]},
               "tlsKeyB64":        {"value": os.environ["TLS_KEY_B64"]},
