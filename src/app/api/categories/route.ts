@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Get all categories, sorted by order
     const categories = await Category.find().sort({ order: 1, name: 1 }).lean();
-    
+
     // Support React Admin pagination
     const start = parseInt(searchParams.get('_start') || '0');
     const end = parseInt(searchParams.get('_end') || String(categories.length));
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const order = searchParams.get('_order') || 'ASC';
 
     let result = [...categories];
-    
+
     // Sort
     if (sort) {
       result.sort((a: any, b: any) => {
@@ -40,13 +40,21 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const total = result.length;
+
     // Paginate
     result = result.slice(start, end);
 
-    return NextResponse.json(result, {
+    // Transform _id to id for React Admin
+    const transformedResult = result.map((category: any) => ({
+      ...category,
+      id: category._id.toString(),
+    }));
+
+    return NextResponse.json(transformedResult, {
       headers: {
-        'X-Total-Count': String(categories.length),
-        'Access-Control-Expose-Headers': 'X-Total-Count',
+        'Content-Range': `categories ${start}-${Math.min(end, total)}/${total}`,
+        'Access-Control-Expose-Headers': 'Content-Range',
       },
     });
   } catch (error) {
