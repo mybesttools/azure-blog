@@ -1,0 +1,25 @@
+name: Seed Categories (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    name: Seed Categories
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed categories
+        run: npm run seed-categories
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
