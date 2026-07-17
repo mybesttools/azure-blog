@@ -82,7 +82,7 @@ export default async function CategoryPage({ params }: { params: Params }) {
       <Container>
         <Header />
         <section>
-          <h1 className="mb-8 text-5xl md:text-7xl font-bold tracking-tighter leading-tight">
+          <h1 className="mb-8 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
             {category.name}
           </h1>
           {category.description && (

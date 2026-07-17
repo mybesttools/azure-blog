@@ -96,7 +96,7 @@ export default async function ShopPage() {
       <Header />
       <Container>
         <section className="py-16">
-          <h1 className="mb-8 text-5xl md:text-7xl font-bold tracking-tighter leading-tight">
+          <h1 className="mb-8 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
             Shop Premium Tools & Products
           </h1>
           <p className="text-lg md:text-xl mb-12 text-gray-700 dark:text-gray-300 max-w-3xl">
