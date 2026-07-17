@@ -7,6 +7,8 @@ import { connectDB } from "@/lib/mongodb";
 import Category from "@/models/Category";
 import PostModel from "@/models/Post";
 
+export const dynamic = 'force-dynamic';
+
 type Params = Promise<{
   slug: string;
 }>;
@@ -98,10 +100,8 @@ export default async function CategoryPage({ params }: { params: Params }) {
 }
 
 export async function generateStaticParams() {
-  await connectDB();
-  const categories = await Category.find().lean();
-
-  return categories.map((category) => ({
-    slug: category.slug,
-  }));
+  // Returning empty array to skip static generation during build time.
+  // Same rationale as posts/[slug]: MongoDB isn't available during the
+  // Docker build, so categories are rendered on-demand instead.
+  return [];
 }
