@@ -106,6 +106,11 @@ const Header = async () => {
               Shop
             </Link>
           </li>
+          <li>
+            <Link href="/ghiffa" className="hover:underline">
+              Ghiffa
+            </Link>
+          </li>
           {/* Login/Logout Button */}
           {session?.user ? (
             <li className="relative group">

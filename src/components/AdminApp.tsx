@@ -304,6 +304,61 @@ const MediaCreate = () => (
   </Create>
 );
 
+const BookingList = () => (
+  <List>
+    <Datagrid rowClick="edit">
+      <TextField source="name" />
+      <TextField source="email" />
+      <DateField source="from" />
+      <DateField source="to" />
+      <TextField source="status" />
+      <DateField source="createdAt" />
+    </Datagrid>
+  </List>
+);
+
+const BookingEdit = () => (
+  <Edit>
+    <SimpleForm>
+      <SelectInput
+        source="status"
+        label="Approval status"
+        choices={[
+          { id: 'pending', name: 'Pending' },
+          { id: 'confirmed', name: 'Confirmed' },
+          { id: 'declined', name: 'Declined' },
+        ]}
+      />
+      <TextInput source="name" fullWidth />
+      <TextInput source="email" fullWidth />
+      <DateInput source="from" />
+      <DateInput source="to" />
+      <TextInput source="notes" fullWidth multiline rows={3} />
+    </SimpleForm>
+  </Edit>
+);
+
+const BookingCreate = () => (
+  <Create>
+    <SimpleForm defaultValues={{ status: 'confirmed' }}>
+      <SelectInput
+        source="status"
+        label="Approval status"
+        choices={[
+          { id: 'pending', name: 'Pending' },
+          { id: 'confirmed', name: 'Confirmed' },
+          { id: 'declined', name: 'Declined' },
+        ]}
+      />
+      <TextInput source="name" fullWidth required />
+      <TextInput source="email" fullWidth required />
+      <DateInput source="from" required />
+      <DateInput source="to" required />
+      <TextInput source="notes" fullWidth multiline rows={3} />
+    </SimpleForm>
+  </Create>
+);
+
 // Custom menu with MFA link
 const CustomMenu = () => (
   <Menu>
@@ -312,6 +367,7 @@ const CustomMenu = () => (
     <Menu.ResourceItem name="categories" />
     <Menu.ResourceItem name="users" />
     <Menu.ResourceItem name="media" />
+    <Menu.ResourceItem name="bookings" />
     <MenuItemLink
       to="/admin/mfa"
       primaryText="MFA Settings"
@@ -355,6 +411,7 @@ export default function AdminApp() {
       <Resource name="categories" list={CategoryList} edit={CategoryEdit} create={CategoryCreate} />
       <Resource name="users" list={UserList} edit={UserEdit} create={UserCreate} />
       <Resource name="media" list={MediaList} create={MediaCreate} />
+      <Resource name="bookings" list={BookingList} edit={BookingEdit} create={BookingCreate} />
     </Admin>
   );
 }
