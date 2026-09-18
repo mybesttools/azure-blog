@@ -38,7 +38,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await connectDB();
         const user = await User.findOne({ email: credentials.email as string });
 
-        if (!user) {
+        if (!user || user.type !== 'local' || !user.password) {
           return null;
         }
 
@@ -86,6 +86,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user._id.toString(),
           email: user.email,
           name: user.name,
+          role: user.role,
         };
       },
     }),
@@ -97,15 +98,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account, profile }) {
+      if (user && account?.provider === 'azure-ad') {
+        // First-login registration: an Entra ID sign-in has no local User
+        // document yet, so provision one here (role always defaults to
+        // 'user' — admin must be granted explicitly, never auto-assigned).
+        await connectDB();
+        const email = (user.email || (profile as any)?.email || '').toLowerCase();
+        let dbUser = await User.findOne({ email });
+        if (!dbUser) {
+          dbUser = await User.create({
+            email,
+            name: user.name || (profile as any)?.name || email,
+            type: 'entraId',
+            role: 'user',
+          });
+        }
+        token.id = dbUser._id.toString();
+        token.role = dbUser.role;
+      } else if (user) {
         token.id = user.id;
+        token.role = (user as any).role || 'user';
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
+        (session.user as any).role = token.role;
       }
       return session;
     },
