@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { UpcomingStay } from './page';
-
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
+import { useLang } from './LanguageContext';
 
 function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -21,9 +17,37 @@ function dayStatus(iso: string, stays: UpcomingStay[]) {
   return null;
 }
 
-export function YearCalendar({ stays }: { stays: UpcomingStay[] }) {
+type Props = {
+  stays: UpcomingStay[];
+  selectedFrom?: string | null;
+  selectedTo?: string | null;
+  onSelectRange?: (from: string, to: string) => void;
+};
+
+export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }: Props) {
+  const { t } = useLang();
   const [year, setYear] = useState(() => new Date().getFullYear());
+  const [pendingStart, setPendingStart] = useState<string | null>(null);
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
+
+  const handleDayClick = (iso: string) => {
+    if (!onSelectRange) return;
+
+    if (!pendingStart) {
+      setPendingStart(iso);
+      return;
+    }
+
+    if (iso === pendingStart) {
+      setPendingStart(null);
+      return;
+    }
+
+    const from = iso < pendingStart ? iso : pendingStart;
+    const to = iso < pendingStart ? pendingStart : iso;
+    onSelectRange(from, to);
+    setPendingStart(null);
+  };
 
   return (
     <div>
@@ -31,7 +55,7 @@ export function YearCalendar({ stays }: { stays: UpcomingStay[] }) {
         <button
           type="button"
           onClick={() => setYear((y) => y - 1)}
-          aria-label="Previous year"
+          aria-label={t.prevYear}
           className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm hover:border-gray-400 dark:hover:border-gray-500"
         >
           &larr;
@@ -40,33 +64,33 @@ export function YearCalendar({ stays }: { stays: UpcomingStay[] }) {
         <button
           type="button"
           onClick={() => setYear((y) => y + 1)}
-          aria-label="Next year"
+          aria-label={t.nextYear}
           className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm hover:border-gray-400 dark:hover:border-gray-500"
         >
           &rarr;
         </button>
         <div className="flex items-center gap-4 ml-auto text-xs text-gray-600 dark:text-gray-400">
           <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm bg-green-500" /> Confirmed
+            <span className="inline-block w-3 h-3 rounded-sm bg-green-500" /> {t.legendConfirmed}
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm bg-amber-400" /> Pending
+            <span className="inline-block w-3 h-3 rounded-sm bg-amber-400" /> {t.legendPending}
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600" /> Free
+            <span className="inline-block w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600" /> {t.legendFree}
           </span>
         </div>
       </div>
 
       <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700 p-3">
-        <div className="min-w-[640px] space-y-1">
-          {MONTHS.map((label, m) => {
+        <div className="min-w-[860px] space-y-1">
+          {t.months.map((label, m) => {
             const daysInMonth = new Date(year, m + 1, 0).getDate();
             return (
               <div
                 key={label}
                 className="grid items-center gap-[2px]"
-                style={{ gridTemplateColumns: '2.75rem repeat(31, minmax(10px, 1fr))' }}
+                style={{ gridTemplateColumns: '2.75rem repeat(31, minmax(18px, 1fr))' }}
               >
                 <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
@@ -76,22 +100,43 @@ export function YearCalendar({ stays }: { stays: UpcomingStay[] }) {
                   const iso = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                   const stay = dayStatus(iso, stays);
                   const isToday = iso === todayIso;
+                  const isFree = !stay;
+                  const isPendingStart = iso === pendingStart;
+                  const isInSelectedRange = Boolean(
+                    selectedFrom && selectedTo && iso >= selectedFrom && iso <= selectedTo
+                  );
+
+                  let statusClasses: string;
+                  if (stay?.status === 'confirmed') {
+                    statusClasses = 'bg-green-500 border-green-500 text-white';
+                  } else if (stay?.status === 'pending') {
+                    statusClasses = 'bg-amber-400 border-amber-400 text-white';
+                  } else {
+                    statusClasses = 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500';
+                  }
+
+                  const stayStatusLabel = stay?.status === 'confirmed' ? t.legendConfirmed : t.legendPending;
+                  const title = stay
+                    ? `${d} ${label} — ${stay.firstName} (${stayStatusLabel})`
+                    : `${d} ${label} — ${t.legendFree}`;
+
+                  const selectionRing =
+                    isPendingStart || isInSelectedRange ? 'ring-2 ring-inset ring-indigo-600 dark:ring-indigo-400' : '';
+                  const todayRing = isToday && !isPendingStart && !isInSelectedRange ? 'ring-2 ring-inset ring-gray-900 dark:ring-white' : '';
+
                   return (
-                    <span
+                    <button
                       key={d}
-                      title={
-                        stay
-                          ? `${d} ${label} — ${stay.firstName} (${stay.status})`
-                          : `${d} ${label} — free`
-                      }
-                      className={`aspect-square rounded-[3px] border ${
-                        stay?.status === 'confirmed'
-                          ? 'bg-green-500 border-green-500'
-                          : stay?.status === 'pending'
-                          ? 'bg-amber-400 border-amber-400'
-                          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                      } ${isToday ? 'ring-2 ring-inset ring-gray-900 dark:ring-white' : ''}`}
-                    />
+                      type="button"
+                      title={title}
+                      disabled={!isFree}
+                      onClick={() => handleDayClick(iso)}
+                      className={`aspect-square rounded-[3px] border flex items-center justify-center text-[9px] leading-none tabular-nums ${statusClasses} ${selectionRing} ${todayRing} ${
+                        isFree ? 'cursor-pointer hover:opacity-70' : 'cursor-default'
+                      }`}
+                    >
+                      {d}
+                    </button>
                   );
                 })}
               </div>

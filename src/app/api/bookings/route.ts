@@ -11,11 +11,55 @@ function formatRange(from: Date, to: Date) {
   return `${format(from, 'd MMM yyyy')} - ${format(to, 'd MMM yyyy')}`;
 }
 
-// GET all bookings or a single booking (admin only)
+// Being signed in is not enough: anyone with an account in the tenant (family
+// members included) can get a session, but only the apartment owner may see
+// requester details or approve/decline stays. A requestor may still edit
+// their own booking - see the isRequestOwner branch in PUT below.
+async function getAuthContext() {
+  const session = await auth();
+  const callerEmail = session?.user?.email?.toLowerCase();
+  const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase();
+  return {
+    callerEmail,
+    isOwner: Boolean(callerEmail && ownerEmail && callerEmail === ownerEmail),
+  };
+}
+
+async function notifyOwnerOfRequest(booking: {
+  _id: unknown;
+  name: string;
+  email: string;
+  from: Date;
+  to: Date;
+  notes?: string;
+}) {
+  const ownerEmail = process.env.OWNER_EMAIL;
+  if (!ownerEmail) {
+    console.warn('[bookings] OWNER_EMAIL is not configured; owner was not notified of a request.');
+    return;
+  }
+
+  await sendMail({
+    to: ownerEmail,
+    subject: `New stay request for Ghiffa: ${booking.name}`,
+    text: [
+      `${booking.name} (${booking.email}) has requested to stay at ${ADDRESS}.`,
+      '',
+      `Dates: ${formatRange(booking.from, booking.to)}`,
+      booking.notes ? `Notes: ${booking.notes}` : undefined,
+      '',
+      'Review and approve or decline this request in the admin dashboard:',
+      `${process.env.NEXT_PUBLIC_SITE_URL || ''}/admin#/bookings/${booking._id}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  });
+}
+
+// GET all bookings or a single booking (owner only)
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    if (!(await getAuthContext()).isOwner) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -94,26 +138,7 @@ export async function POST(request: NextRequest) {
     // Status is always set server-side; requests always start out pending approval.
     const booking = await Booking.create({ name, email, from, to, notes, status: 'pending' });
 
-    const ownerEmail = process.env.OWNER_EMAIL;
-    if (ownerEmail) {
-      await sendMail({
-        to: ownerEmail,
-        subject: `New stay request for Ghiffa: ${name}`,
-        text: [
-          `${name} (${email}) has requested to stay at ${ADDRESS}.`,
-          '',
-          `Dates: ${formatRange(from, to)}`,
-          notes ? `Notes: ${notes}` : undefined,
-          '',
-          'Review and approve or decline this request in the admin dashboard:',
-          `${process.env.NEXT_PUBLIC_SITE_URL || ''}/admin#/bookings/${booking._id}`,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-      });
-    } else {
-      console.warn('[bookings] OWNER_EMAIL is not configured; owner was not notified of a new request.');
-    }
+    await notifyOwnerOfRequest(booking);
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
@@ -122,11 +147,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update a booking, e.g. approve/decline (admin only)
+// PUT - Update a booking (owner only), or a requestor editing their own
+// booking's dates/notes (which always resets it to pending - any change
+// needs the owner's approval again).
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const { callerEmail, isOwner } = await getAuthContext();
+    if (!callerEmail) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -144,41 +171,73 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
+    const isRequestOwner = callerEmail === existing.email.toLowerCase();
+    if (!isOwner && !isRequestOwner) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const previousStatus = existing.status;
     const body = await request.json();
 
-    const booking = await Booking.findByIdAndUpdate(id, body, { new: true });
+    let update: Record<string, unknown>;
+
+    if (isOwner) {
+      // Full control: approve/decline, edit any field.
+      update = body;
+    } else {
+      // The requestor may only change their own dates/notes, never the
+      // status directly - any edit sends it back through approval.
+      const from = body.from ? new Date(body.from) : null;
+      const to = body.to ? new Date(body.to) : null;
+
+      if (!from || !to || isNaN(from.getTime()) || isNaN(to.getTime())) {
+        return NextResponse.json({ error: 'from and to are required' }, { status: 400 });
+      }
+      if (to <= from) {
+        return NextResponse.json({ error: 'to must be after from' }, { status: 400 });
+      }
+
+      const notes = typeof body.notes === 'string' ? body.notes.trim() : undefined;
+      update = { from, to, notes, status: 'pending' };
+    }
+
+    const booking = await Booking.findByIdAndUpdate(id, update, { new: true });
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // Notify the requestor only when the owner's approval decision actually changes.
-    if (booking.status !== previousStatus && (booking.status === 'confirmed' || booking.status === 'declined')) {
-      if (booking.status === 'confirmed') {
-        await sendMail({
-          to: booking.email,
-          subject: `Your stay at Ghiffa is confirmed`,
-          text: [
-            `Hi ${booking.name},`,
-            '',
-            `Your stay at ${ADDRESS} has been confirmed for:`,
-            formatRange(booking.from, booking.to),
-            '',
-            'See you there!',
-          ].join('\n'),
-        });
-      } else {
-        await sendMail({
-          to: booking.email,
-          subject: `Your stay request for Ghiffa`,
-          text: [
-            `Hi ${booking.name},`,
-            '',
-            `Unfortunately your requested stay at ${ADDRESS} (${formatRange(booking.from, booking.to)}) could not be confirmed.`,
-            'Please get in touch to find another date.',
-          ].join('\n'),
-        });
+    if (isOwner) {
+      // Notify the requestor only when the owner's approval decision actually changes.
+      if (booking.status !== previousStatus && (booking.status === 'confirmed' || booking.status === 'declined')) {
+        if (booking.status === 'confirmed') {
+          await sendMail({
+            to: booking.email,
+            subject: `Your stay at Ghiffa is confirmed`,
+            text: [
+              `Hi ${booking.name},`,
+              '',
+              `Your stay at ${ADDRESS} has been confirmed for:`,
+              formatRange(booking.from, booking.to),
+              '',
+              'See you there!',
+            ].join('\n'),
+          });
+        } else {
+          await sendMail({
+            to: booking.email,
+            subject: `Your stay request for Ghiffa`,
+            text: [
+              `Hi ${booking.name},`,
+              '',
+              `Unfortunately your requested stay at ${ADDRESS} (${formatRange(booking.from, booking.to)}) could not be confirmed.`,
+              'Please get in touch to find another date.',
+            ].join('\n'),
+          });
+        }
       }
+    } else {
+      // The requestor changed their own booking - it needs the owner's attention again.
+      await notifyOwnerOfRequest(booking);
     }
 
     return NextResponse.json(booking);
@@ -188,11 +247,10 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete a booking (admin only)
+// DELETE - Delete a booking (owner only)
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    if (!(await getAuthContext()).isOwner) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

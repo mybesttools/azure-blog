@@ -1,21 +1,40 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
+import { useLang } from './LanguageContext';
 
 const inputClasses =
   'block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400';
 
 const labelClasses = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1';
 
-export function RequestForm() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+export function RequestForm({
+  defaultName = '',
+  defaultEmail = '',
+  selectedFrom = null,
+  selectedTo = null,
+}: {
+  defaultName?: string;
+  defaultEmail?: string;
+  selectedFrom?: string | null;
+  selectedTo?: string | null;
+}) {
+  const { t } = useLang();
+  const [name, setName] = useState(defaultName);
+  const [email, setEmail] = useState(defaultEmail);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (selectedFrom && selectedTo) {
+      setFrom(selectedFrom);
+      setTo(selectedTo);
+    }
+  }, [selectedFrom, selectedTo]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,14 +51,14 @@ export function RequestForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Something went wrong. Please try again.');
+        setError(data.error || t.genericError);
         return;
       }
 
       setSuccess(true);
     } catch (err) {
       console.error('Error submitting stay request:', err);
-      setError('Something went wrong. Please try again.');
+      setError(t.genericError);
     } finally {
       setSubmitting(false);
     }
@@ -48,9 +67,7 @@ export function RequestForm() {
   if (success) {
     return (
       <div className="rounded-md border border-green-200 bg-green-50 px-4 py-4 dark:border-green-800 dark:bg-green-900/30">
-        <p className="text-green-900 dark:text-green-200">
-          Your request has been sent to Mike for approval. You&apos;ll get an email once it&apos;s confirmed.
-        </p>
+        <p className="text-green-900 dark:text-green-200">{t.successMessage}</p>
       </div>
     );
   }
@@ -65,7 +82,7 @@ export function RequestForm() {
 
       <div>
         <label htmlFor="name" className={labelClasses}>
-          Name
+          {t.formName}
         </label>
         <input
           id="name"
@@ -80,7 +97,7 @@ export function RequestForm() {
 
       <div>
         <label htmlFor="email" className={labelClasses}>
-          Email
+          {t.formEmail}
         </label>
         <input
           id="email"
@@ -96,7 +113,7 @@ export function RequestForm() {
       <div className="flex gap-4">
         <div className="flex-1">
           <label htmlFor="from" className={labelClasses}>
-            From
+            {t.formFrom}
           </label>
           <input
             id="from"
@@ -115,7 +132,7 @@ export function RequestForm() {
         </div>
         <div className="flex-1">
           <label htmlFor="to" className={labelClasses}>
-            To
+            {t.formTo}
           </label>
           <input
             id="to"
@@ -132,7 +149,7 @@ export function RequestForm() {
 
       <div>
         <label htmlFor="notes" className={labelClasses}>
-          Notes <span className="text-gray-400 dark:text-gray-500">(optional)</span>
+          {t.formNotes} <span className="text-gray-400 dark:text-gray-500">{t.formNotesOptional}</span>
         </label>
         <textarea
           id="notes"
@@ -149,7 +166,7 @@ export function RequestForm() {
         disabled={submitting}
         className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {submitting ? 'Sending request...' : 'Request a stay'}
+        {submitting ? t.submitBusy : t.submitIdle}
       </button>
     </form>
   );

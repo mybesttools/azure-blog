@@ -1,10 +1,18 @@
 'use client';
 
 import { signIn, getProviders } from 'next-auth/react';
-import { useState, useEffect, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect, FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
@@ -13,16 +21,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkingSso, setCheckingSso] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/admin';
 
   useEffect(() => {
     getProviders().then((providers) => {
       if (providers?.['azure-ad']) {
-        signIn('azure-ad', { callbackUrl: '/admin' });
+        signIn('azure-ad', { callbackUrl });
       } else {
         setCheckingSso(false);
       }
     });
-  }, []);
+  }, [callbackUrl]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,7 +74,7 @@ export default function LoginPage() {
 
         if (result?.ok && !result?.error) {
           // Only redirect if ok=true AND no error
-          router.push('/admin');
+          router.push(callbackUrl);
         }
       } else {
         // Second step: Submit with MFA code
@@ -83,7 +93,7 @@ export default function LoginPage() {
         }
 
         if (result?.ok && !result?.error) {
-          router.push('/admin');
+          router.push(callbackUrl);
         }
       }
     } catch (err) {
@@ -107,7 +117,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Admin Login
+            Sign in
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

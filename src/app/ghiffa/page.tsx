@@ -1,11 +1,13 @@
 import Container from '@/app/_components/container';
 import Header from '@/app/_components/header';
+import { auth } from '@/auth';
 import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
-import { format } from 'date-fns';
 import type { Metadata } from 'next';
-import { RequestForm } from './RequestForm';
-import { YearCalendar } from './YearCalendar';
+import { redirect } from 'next/navigation';
+import { GhiffaContent } from './GhiffaContent';
+import type { MyRequest } from './MyRequests';
+import type { PendingRequest } from './PendingRequests';
 
 const ADDRESS = 'Via Cerutti 8, Ghiffa (VB), Italy';
 
@@ -50,76 +52,81 @@ async function getUpcomingStays(): Promise<UpcomingStay[]> {
   }
 }
 
-function formatRange(from: string, to: string) {
-  return `${format(new Date(from), 'd MMM yyyy')} – ${format(new Date(to), 'd MMM yyyy')}`;
+async function getPendingRequests(): Promise<PendingRequest[]> {
+  try {
+    await connectDB();
+    const bookings = await Booking.find({ status: 'pending' }).sort({ from: 1 }).lean();
+
+    return bookings.map((booking: any) => ({
+      id: booking._id.toString(),
+      name: booking.name,
+      email: booking.email,
+      from: booking.from.toISOString(),
+      to: booking.to.toISOString(),
+      notes: booking.notes,
+    }));
+  } catch (error) {
+    console.error('Error fetching pending requests:', error);
+    return [];
+  }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function getMyRequests(email: string): Promise<MyRequest[]> {
+  try {
+    await connectDB();
+    const bookings = await Booking.find({ email: new RegExp(`^${escapeRegExp(email)}$`, 'i') })
+      .sort({ from: 1 })
+      .lean();
+
+    return bookings.map((booking: any) => ({
+      id: booking._id.toString(),
+      from: booking.from.toISOString(),
+      to: booking.to.toISOString(),
+      notes: booking.notes,
+      status: booking.status,
+    }));
+  } catch (error) {
+    console.error('Error fetching your requests:', error);
+    return [];
+  }
 }
 
 export default async function GhiffaPage() {
-  const stays = await getUpcomingStays();
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect('/admin/login?callbackUrl=/ghiffa');
+  }
+
+  const isOwner = Boolean(
+    session.user.email &&
+      process.env.OWNER_EMAIL &&
+      session.user.email.toLowerCase() === process.env.OWNER_EMAIL.toLowerCase()
+  );
+
+  const [stays, pendingRequests, myRequests] = await Promise.all([
+    getUpcomingStays(),
+    isOwner ? getPendingRequests() : Promise.resolve([]),
+    session.user.email ? getMyRequests(session.user.email) : Promise.resolve([]),
+  ]);
 
   return (
     <main>
       <Container>
         <Header />
-        <section className="mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tighter leading-tight mb-4">
-            Ghiffa Apartment
-          </h1>
-          <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-300 max-w-2xl">
-            Our family apartment at {ADDRESS}. See who&apos;s planning to stay below, or
-            request your own dates.
-          </p>
-        </section>
-
-        <section className="mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-6">
-            Availability calendar
-          </h2>
-          <YearCalendar stays={stays} />
-        </section>
-
-        <section className="mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-6">
-            Upcoming stays
-          </h2>
-          {stays.length > 0 ? (
-            <ul className="space-y-3 max-w-2xl">
-              {stays.map((stay) => (
-                <li
-                  key={stay.id}
-                  className="flex items-center justify-between gap-4 rounded-md border border-gray-200 dark:border-gray-700 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium">{stay.firstName}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {formatRange(stay.from, stay.to)}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                      stay.status === 'confirmed'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                    }`}
-                  >
-                    {stay.status === 'confirmed' ? 'Confirmed' : 'Pending approval'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-600 dark:text-gray-400">
-              No upcoming stays yet. Be the first to request one below!
-            </p>
-          )}
-        </section>
-
-        <section className="mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tighter mb-6">
-            Request a stay
-          </h2>
-          <RequestForm />
-        </section>
+        <GhiffaContent
+          address={ADDRESS}
+          stays={stays}
+          pendingRequests={pendingRequests}
+          myRequests={myRequests}
+          isOwner={isOwner}
+          defaultName={session.user.name ?? ''}
+          defaultEmail={session.user.email ?? ''}
+        />
       </Container>
     </main>
   );
