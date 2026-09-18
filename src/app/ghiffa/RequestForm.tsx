@@ -19,7 +19,7 @@ export function RequestForm({
   selectedFrom?: string | null;
   selectedTo?: string | null;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [name, setName] = useState(defaultName);
   const [email, setEmail] = useState(defaultEmail);
   const [from, setFrom] = useState('');
@@ -45,7 +45,7 @@ export function RequestForm({
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, from, to, notes: notes || undefined }),
+        body: JSON.stringify({ name, email, from, to, notes: notes || undefined, lang }),
       });
 
       const data = await res.json();

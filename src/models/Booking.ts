@@ -7,6 +7,7 @@ export interface IBooking extends Document {
   to: Date;
   notes?: string;
   status: 'pending' | 'confirmed' | 'declined';
+  lang: 'pl' | 'en' | 'de';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +37,11 @@ const BookingSchema = new Schema<IBooking>(
       type: String,
       enum: ['pending', 'confirmed', 'declined'],
       default: 'pending',
+    },
+    lang: {
+      type: String,
+      enum: ['pl', 'en', 'de'],
+      default: 'pl',
     },
   },
   {

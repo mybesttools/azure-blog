@@ -11,6 +11,67 @@ function formatRange(from: Date, to: Date) {
   return `${format(from, 'd MMM yyyy')} - ${format(to, 'd MMM yyyy')}`;
 }
 
+// Requester-facing confirm/decline emails, in the language the request was
+// originally submitted in (Booking.lang) - not the owner's own language.
+const CONFIRM_EMAIL = {
+  en: (name: string, address: string, range: string) => ({
+    subject: 'Your stay at Ghiffa is confirmed',
+    text: [`Hi ${name},`, '', `Your stay at ${address} has been confirmed for:`, range, '', 'See you there!'].join('\n'),
+  }),
+  pl: (name: string, address: string, range: string) => ({
+    subject: 'Twój pobyt w Ghiffie jest potwierdzony',
+    text: [
+      `Cześć ${name},`,
+      '',
+      `Twój pobyt pod adresem ${address} został potwierdzony na:`,
+      range,
+      '',
+      'Do zobaczenia!',
+    ].join('\n'),
+  }),
+  de: (name: string, address: string, range: string) => ({
+    subject: 'Dein Aufenthalt in Ghiffa ist bestätigt',
+    text: [
+      `Hallo ${name},`,
+      '',
+      `Dein Aufenthalt in ${address} wurde bestätigt für:`,
+      range,
+      '',
+      'Bis dann!',
+    ].join('\n'),
+  }),
+} as const;
+
+const DECLINE_EMAIL = {
+  en: (name: string, address: string, range: string) => ({
+    subject: 'Your stay request for Ghiffa',
+    text: [
+      `Hi ${name},`,
+      '',
+      `Unfortunately your requested stay at ${address} (${range}) could not be confirmed.`,
+      'Please get in touch to find another date.',
+    ].join('\n'),
+  }),
+  pl: (name: string, address: string, range: string) => ({
+    subject: 'Twoja prośba o pobyt w Ghiffie',
+    text: [
+      `Cześć ${name},`,
+      '',
+      `Niestety Twój wniosek o pobyt pod adresem ${address} (${range}) nie mógł zostać potwierdzony.`,
+      'Skontaktuj się, aby ustalić inny termin.',
+    ].join('\n'),
+  }),
+  de: (name: string, address: string, range: string) => ({
+    subject: 'Deine Aufenthaltsanfrage für Ghiffa',
+    text: [
+      `Hallo ${name},`,
+      '',
+      `Leider konnte dein Aufenthalt in ${address} (${range}) nicht bestätigt werden.`,
+      'Bitte melde dich, um einen anderen Termin zu finden.',
+    ].join('\n'),
+  }),
+} as const;
+
 // Being signed in is not enough: anyone with an account in the tenant (family
 // members included) can get a session, but only the apartment owner may see
 // requester details or approve/decline stays. A requestor may still edit
@@ -48,8 +109,8 @@ async function notifyOwnerOfRequest(booking: {
       `Dates: ${formatRange(booking.from, booking.to)}`,
       booking.notes ? `Notes: ${booking.notes}` : undefined,
       '',
-      'Review and approve or decline this request in the admin dashboard:',
-      `${process.env.NEXT_PUBLIC_SITE_URL || ''}/admin#/bookings/${booking._id}`,
+      'Review and approve or decline this request:',
+      `${process.env.NEXT_PUBLIC_SITE_URL || ''}/ghiffa`,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -126,6 +187,7 @@ export async function POST(request: NextRequest) {
     const notes = typeof body.notes === 'string' ? body.notes.trim() : undefined;
     const from = body.from ? new Date(body.from) : null;
     const to = body.to ? new Date(body.to) : null;
+    const lang = body.lang === 'pl' || body.lang === 'en' || body.lang === 'de' ? body.lang : 'pl';
 
     if (!name || !email || !from || !to || isNaN(from.getTime()) || isNaN(to.getTime())) {
       return NextResponse.json({ error: 'name, email, from and to are required' }, { status: 400 });
@@ -136,7 +198,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Status is always set server-side; requests always start out pending approval.
-    const booking = await Booking.create({ name, email, from, to, notes, status: 'pending' });
+    const booking = await Booking.create({ name, email, from, to, notes, lang, status: 'pending' });
 
     await notifyOwnerOfRequest(booking);
 
@@ -209,30 +271,15 @@ export async function PUT(request: NextRequest) {
     if (isOwner) {
       // Notify the requestor only when the owner's approval decision actually changes.
       if (booking.status !== previousStatus && (booking.status === 'confirmed' || booking.status === 'declined')) {
+        const lang: 'pl' | 'en' | 'de' = booking.lang === 'en' || booking.lang === 'de' ? booking.lang : 'pl';
+        const range = formatRange(booking.from, booking.to);
+
         if (booking.status === 'confirmed') {
-          await sendMail({
-            to: booking.email,
-            subject: `Your stay at Ghiffa is confirmed`,
-            text: [
-              `Hi ${booking.name},`,
-              '',
-              `Your stay at ${ADDRESS} has been confirmed for:`,
-              formatRange(booking.from, booking.to),
-              '',
-              'See you there!',
-            ].join('\n'),
-          });
+          const { subject, text } = CONFIRM_EMAIL[lang](booking.name, ADDRESS, range);
+          await sendMail({ to: booking.email, subject, text });
         } else {
-          await sendMail({
-            to: booking.email,
-            subject: `Your stay request for Ghiffa`,
-            text: [
-              `Hi ${booking.name},`,
-              '',
-              `Unfortunately your requested stay at ${ADDRESS} (${formatRange(booking.from, booking.to)}) could not be confirmed.`,
-              'Please get in touch to find another date.',
-            ].join('\n'),
-          });
+          const { subject, text } = DECLINE_EMAIL[lang](booking.name, ADDRESS, range);
+          await sendMail({ to: booking.email, subject, text });
         }
       }
     } else {
