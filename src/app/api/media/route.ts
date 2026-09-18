@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Media from '@/models/Media';
-import { getSession } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 
 // Allow up to 60 seconds for upload processing
 export const maxDuration = 60;
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await requireAdmin();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await requireAdmin();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -2,8 +2,10 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IUser extends Document {
   email: string;
-  password: string;
+  password?: string;
   name: string;
+  role: 'admin' | 'user';
+  type: 'local' | 'entraId';
   mfaEnabled: boolean;
   mfaSecret?: string;
   createdAt: Date;
@@ -21,11 +23,24 @@ const UserSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      // Entra ID users authenticate via SSO and have no local password.
+      required: function (this: IUser) {
+        return this.type === 'local';
+      },
     },
     name: {
       type: String,
       required: true,
+    },
+    role: {
+      type: String,
+      enum: ['admin', 'user'],
+      default: 'user',
+    },
+    type: {
+      type: String,
+      enum: ['local', 'entraId'],
+      default: 'local',
     },
     mfaEnabled: {
       type: Boolean,
