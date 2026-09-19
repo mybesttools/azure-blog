@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { UpcomingStay } from './page';
 import { useLang } from './LanguageContext';
+import { LOCALES } from './i18n';
 
 function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -17,6 +18,13 @@ function dayStatus(iso: string, stays: UpcomingStay[]) {
   return null;
 }
 
+function formatStayRange(stay: UpcomingStay, locale: string) {
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+  const from = new Date(stay.from).toLocaleDateString(locale, opts);
+  const to = new Date(stay.to).toLocaleDateString(locale, opts);
+  return `${from} – ${to}`;
+}
+
 type Props = {
   stays: UpcomingStay[];
   selectedFrom?: string | null;
@@ -25,7 +33,7 @@ type Props = {
 };
 
 export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }: Props) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [pendingStart, setPendingStart] = useState<string | null>(null);
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
@@ -120,27 +128,34 @@ export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }:
                   }
 
                   const stayStatusLabel = stay?.status === 'confirmed' ? t.legendConfirmed : t.legendPending;
-                  const title = stay
-                    ? `${d} ${label} — ${stay.firstName} (${stayStatusLabel})`
-                    : `${d} ${label} — ${t.legendFree}`;
+                  const freeTitle = !stay ? `${d} ${label} — ${t.legendFree}` : undefined;
 
                   const selectionRing =
                     isPendingStart || isInSelectedRange ? 'ring-2 ring-inset ring-indigo-600 dark:ring-indigo-400' : '';
                   const todayRing = isToday && !isPendingStart && !isInSelectedRange ? 'ring-2 ring-inset ring-gray-900 dark:ring-white' : '';
 
                   return (
-                    <button
-                      key={d}
-                      type="button"
-                      title={title}
-                      disabled={!isSelectable}
-                      onClick={() => handleDayClick(iso)}
-                      className={`aspect-square rounded-[3px] border flex items-center justify-center text-[9px] leading-none tabular-nums ${statusClasses} ${selectionRing} ${todayRing} ${
-                        isSelectable ? 'cursor-pointer hover:opacity-70' : 'cursor-not-allowed'
-                      }`}
-                    >
-                      {d}
-                    </button>
+                    <div key={d} className="relative group">
+                      <button
+                        type="button"
+                        title={freeTitle}
+                        disabled={!isSelectable}
+                        onClick={() => handleDayClick(iso)}
+                        className={`w-full aspect-square rounded-[3px] border flex items-center justify-center text-[9px] leading-none tabular-nums ${statusClasses} ${selectionRing} ${todayRing} ${
+                          isSelectable ? 'cursor-pointer hover:opacity-70' : 'cursor-not-allowed'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                      {stay && (
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block dark:bg-gray-700">
+                          <div className="font-medium">{stay.firstName}</div>
+                          <div className="text-gray-300 dark:text-gray-400">
+                            {formatStayRange(stay, LOCALES[lang])} · {stayStatusLabel}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
