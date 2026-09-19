@@ -94,14 +94,17 @@ async function notifyOwnerOfRequest(booking: {
   to: Date;
   notes?: string;
 }) {
-  const ownerEmail = process.env.OWNER_EMAIL;
-  if (!ownerEmail) {
-    console.warn('[bookings] OWNER_EMAIL is not configured; owner was not notified of a request.');
+  // Where the notification is delivered can be a distribution address (e.g. a
+  // family group) that nobody signs in as - kept separate from OWNER_EMAIL,
+  // which is the single account authorized to approve/decline requests.
+  const notifyEmail = process.env.NOTIFY_EMAIL || process.env.OWNER_EMAIL;
+  if (!notifyEmail) {
+    console.warn('[bookings] NOTIFY_EMAIL/OWNER_EMAIL is not configured; owner was not notified of a request.');
     return;
   }
 
   await sendMail({
-    to: ownerEmail,
+    to: notifyEmail,
     subject: `New stay request for Ghiffa: ${booking.name}`,
     text: [
       `${booking.name} (${booking.email}) has requested to stay at ${ADDRESS}.`,
