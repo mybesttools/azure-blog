@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import { sendMail } from '@/lib/mail';
 import { auth } from '@/auth';
+import { isGhiffaOwner } from '@/lib/ghiffaOwner';
 import { format } from 'date-fns';
 
 const ADDRESS = 'Via Cerutti 8, Ghiffa (VB), Italy';
@@ -73,16 +74,15 @@ const DECLINE_EMAIL = {
 } as const;
 
 // Being signed in is not enough: anyone with an account in the tenant (family
-// members included) can get a session, but only the apartment owner may see
+// members included) can get a session, but only an apartment owner may see
 // requester details or approve/decline stays. A requestor may still edit
 // their own booking - see the isRequestOwner branch in PUT below.
 async function getAuthContext() {
   const session = await auth();
   const callerEmail = session?.user?.email?.toLowerCase();
-  const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase();
   return {
     callerEmail,
-    isOwner: Boolean(callerEmail && ownerEmail && callerEmail === ownerEmail),
+    isOwner: isGhiffaOwner(callerEmail),
   };
 }
 

@@ -2,6 +2,7 @@ import Container from '@/app/_components/container';
 import Header from '@/app/_components/header';
 import { auth } from '@/auth';
 import { connectDB } from '@/lib/mongodb';
+import { isGhiffaOwner } from '@/lib/ghiffaOwner';
 import Booking from '@/models/Booking';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
@@ -102,11 +103,7 @@ export default async function GhiffaPage() {
     redirect('/admin/login?callbackUrl=/ghiffa');
   }
 
-  const isOwner = Boolean(
-    session.user.email &&
-      process.env.OWNER_EMAIL &&
-      session.user.email.toLowerCase() === process.env.OWNER_EMAIL.toLowerCase()
-  );
+  const isOwner = isGhiffaOwner(session.user.email);
 
   const [stays, pendingRequests, myRequests] = await Promise.all([
     getUpcomingStays(),
