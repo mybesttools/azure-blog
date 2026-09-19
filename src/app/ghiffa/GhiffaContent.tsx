@@ -49,12 +49,12 @@ function GhiffaBody({ address, stays, pendingRequests, myRequests, isOwner, defa
           <LanguageSelector />
         </div>
 
-        <div className="mt-8 relative w-full aspect-[16/9] md:aspect-[21/9] rounded-xl overflow-hidden shadow-md">
+        <div className="mt-8 relative w-full md:w-1/2 aspect-[16/9] rounded-xl overflow-hidden shadow-md">
           <Image
             src="/ghiffa/veranda.jpg"
             alt={t.title}
             fill
-            sizes="(min-width: 768px) 100vw, 100vw"
+            sizes="(min-width: 768px) 50vw, 100vw"
             className="object-cover"
             priority
           />
