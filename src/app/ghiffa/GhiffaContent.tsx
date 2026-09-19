@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { LOCALES } from './i18n';
 import { LanguageProvider, useLang } from './LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
@@ -46,6 +47,17 @@ function GhiffaBody({ address, stays, pendingRequests, myRequests, isOwner, defa
             <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-300 max-w-2xl">{t.intro(address)}</p>
           </div>
           <LanguageSelector />
+        </div>
+
+        <div className="mt-8 relative w-full aspect-[16/9] md:aspect-[21/9] rounded-xl overflow-hidden shadow-md">
+          <Image
+            src="/ghiffa/veranda.jpg"
+            alt={t.title}
+            fill
+            sizes="(min-width: 768px) 100vw, 100vw"
+            className="object-cover"
+            priority
+          />
         </div>
       </section>
 
