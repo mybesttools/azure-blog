@@ -36,6 +36,8 @@ function toDateInputValue(iso: string) {
   return iso.slice(0, 10);
 }
 
+const todayIso = new Date().toISOString().slice(0, 10);
+
 export function MyRequests({ requests }: { requests: MyRequest[] }) {
   const router = useRouter();
   const { t, lang } = useLang();
@@ -101,6 +103,7 @@ export function MyRequests({ requests }: { requests: MyRequest[] }) {
                   <input
                     type="date"
                     className={inputClasses}
+                    min={todayIso}
                     value={from}
                     onChange={(e) => {
                       setFrom(e.target.value);
@@ -110,7 +113,7 @@ export function MyRequests({ requests }: { requests: MyRequest[] }) {
                   <input
                     type="date"
                     className={inputClasses}
-                    min={from || undefined}
+                    min={from || todayIso}
                     value={to}
                     onChange={(e) => setTo(e.target.value)}
                   />

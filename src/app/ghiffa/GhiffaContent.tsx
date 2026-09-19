@@ -112,6 +112,7 @@ function GhiffaBody({ address, stays, pendingRequests, myRequests, isOwner, defa
           defaultEmail={defaultEmail}
           selectedFrom={selectedFrom}
           selectedTo={selectedTo}
+          isOwner={isOwner}
         />
       </section>
     </>

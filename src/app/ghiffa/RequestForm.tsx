@@ -13,13 +13,16 @@ export function RequestForm({
   defaultEmail = '',
   selectedFrom = null,
   selectedTo = null,
+  isOwner = false,
 }: {
   defaultName?: string;
   defaultEmail?: string;
   selectedFrom?: string | null;
   selectedTo?: string | null;
+  isOwner?: boolean;
 }) {
   const { t, lang } = useLang();
+  const todayIso = new Date().toISOString().slice(0, 10);
   const [name, setName] = useState(defaultName);
   const [email, setEmail] = useState(defaultEmail);
   const [from, setFrom] = useState('');
@@ -67,7 +70,7 @@ export function RequestForm({
   if (success) {
     return (
       <div className="rounded-md border border-green-200 bg-green-50 px-4 py-4 dark:border-green-800 dark:bg-green-900/30">
-        <p className="text-green-900 dark:text-green-200">{t.successMessage}</p>
+        <p className="text-green-900 dark:text-green-200">{isOwner ? t.successMessageOwner : t.successMessage}</p>
       </div>
     );
   }
@@ -120,6 +123,7 @@ export function RequestForm({
             name="from"
             type="date"
             required
+            min={todayIso}
             className={inputClasses}
             value={from}
             onChange={(e) => {
@@ -139,7 +143,7 @@ export function RequestForm({
             name="to"
             type="date"
             required
-            min={from || undefined}
+            min={from || todayIso}
             className={inputClasses}
             value={to}
             onChange={(e) => setTo(e.target.value)}

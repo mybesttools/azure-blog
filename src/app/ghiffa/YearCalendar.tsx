@@ -100,7 +100,9 @@ export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }:
                   const iso = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                   const stay = dayStatus(iso, stays);
                   const isToday = iso === todayIso;
+                  const isPast = iso < todayIso;
                   const isFree = !stay;
+                  const isSelectable = isFree && !isPast;
                   const isPendingStart = iso === pendingStart;
                   const isInSelectedRange = Boolean(
                     selectedFrom && selectedTo && iso >= selectedFrom && iso <= selectedTo
@@ -111,6 +113,8 @@ export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }:
                     statusClasses = 'bg-green-500 border-green-500 text-white';
                   } else if (stay?.status === 'pending') {
                     statusClasses = 'bg-amber-400 border-amber-400 text-white';
+                  } else if (isPast) {
+                    statusClasses = 'bg-gray-100 dark:bg-gray-900 border-gray-100 dark:border-gray-900 text-gray-300 dark:text-gray-700';
                   } else {
                     statusClasses = 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500';
                   }
@@ -129,10 +133,10 @@ export function YearCalendar({ stays, selectedFrom, selectedTo, onSelectRange }:
                       key={d}
                       type="button"
                       title={title}
-                      disabled={!isFree}
+                      disabled={!isSelectable}
                       onClick={() => handleDayClick(iso)}
                       className={`aspect-square rounded-[3px] border flex items-center justify-center text-[9px] leading-none tabular-nums ${statusClasses} ${selectionRing} ${todayRing} ${
-                        isFree ? 'cursor-pointer hover:opacity-70' : 'cursor-default'
+                        isSelectable ? 'cursor-pointer hover:opacity-70' : 'cursor-not-allowed'
                       }`}
                     >
                       {d}

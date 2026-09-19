@@ -47,6 +47,7 @@ export type Dictionary = {
   submitIdle: string;
   submitBusy: string;
   successMessage: string;
+  successMessageOwner: string;
   genericError: string;
   approve: string;
   decline: string;
@@ -88,6 +89,7 @@ const en: Dictionary = {
   submitIdle: 'Request a stay',
   submitBusy: 'Sending request...',
   successMessage: "Your request has been sent for approval. You'll get an email once it's confirmed.",
+  successMessageOwner: "Your stay is confirmed - it's on the calendar now, no approval needed.",
   genericError: 'Something went wrong. Please try again.',
   approve: 'Approve',
   decline: 'Decline',
@@ -129,6 +131,7 @@ const pl: Dictionary = {
   submitIdle: 'Zgłoś pobyt',
   submitBusy: 'Wysyłanie zgłoszenia...',
   successMessage: 'Twoje zgłoszenie zostało wysłane do akceptacji. Otrzymasz e-mail po potwierdzeniu.',
+  successMessageOwner: 'Twój pobyt jest potwierdzony - jest już w kalendarzu, bez potrzeby akceptacji.',
   genericError: 'Coś poszło nie tak. Spróbuj ponownie.',
   approve: 'Akceptuj',
   decline: 'Odrzuć',
@@ -173,6 +176,7 @@ const de: Dictionary = {
   submitIdle: 'Aufenthalt beantragen',
   submitBusy: 'Anfrage wird gesendet...',
   successMessage: 'Deine Anfrage wurde zur Freigabe gesendet. Du erhältst eine E-Mail, sobald sie bestätigt ist.',
+  successMessageOwner: 'Dein Aufenthalt ist bestätigt - er steht bereits im Kalender, keine Freigabe nötig.',
   genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
   approve: 'Annehmen',
   decline: 'Ablehnen',
