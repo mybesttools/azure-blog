@@ -28,7 +28,7 @@ jobs:
           docker build \
             --build-arg NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN="${{ secrets.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN }}" \
             --build-arg NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN="${{ secrets.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN }}" \
-            --build-arg NEXT_PUBLIC_SITE_URL="https://${{ secrets.ACI_DNS_NAME }}.eastus.azurecontainer.io" \
+            --build-arg NEXT_PUBLIC_SITE_URL="${{ secrets.NEXT_PUBLIC_SITE_URL }}" \
             -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }} \
             -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:latest .
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/azure-blog:${{ github.sha }}
@@ -67,6 +67,9 @@ jobs:
           AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
           AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
           ACI_DNS_NAME: ${{ secrets.ACI_DNS_NAME }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+          MAIL_SENDER: ${{ secrets.MAIL_SENDER }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Base64-encode volume secrets (exported so Python subprocess can read via os.environ)
@@ -103,7 +106,10 @@ jobs:
               "nginxConfB64":        { "type": "string" },
               "tlsCertB64":          { "type": "string" },
               "tlsKeyB64":           { "type": "securestring" },
-              "dnsNameLabel":        { "type": "string" }
+              "dnsNameLabel":        { "type": "string" },
+              "ownerEmail":          { "type": "string" },
+              "notifyEmail":         { "type": "string" },
+              "mailSender":          { "type": "string" }
             },
             "resources": [
               {
@@ -130,7 +136,10 @@ jobs:
                           { "name": "AZURE_AD_TENANT_ID",            "value":      "[parameters('azureAdTenantId')]" },
                           { "name": "MONGODB_URI",                  "secureValue": "[parameters('mongodbUri')]" },
                           { "name": "NEXTAUTH_SECRET",              "secureValue": "[parameters('nextauthSecret')]" },
-                          { "name": "AZURE_AD_CLIENT_SECRET",       "secureValue": "[parameters('azureAdClientSecret')]" }
+                          { "name": "AZURE_AD_CLIENT_SECRET",       "secureValue": "[parameters('azureAdClientSecret')]" },
+                          { "name": "OWNER_EMAIL",                  "value":       "[parameters('ownerEmail')]" },
+                          { "name": "NOTIFY_EMAIL",                 "value":       "[parameters('notifyEmail')]" },
+                          { "name": "MAIL_SENDER",                  "value":       "[parameters('mailSender')]" }
                         ]
                       }
                     },
@@ -211,7 +220,10 @@ jobs:
               "nginxConfB64":     {"value": os.environ["NGINX_CONF_B64"]},
               "tlsCertB64":       {"value": os.environ["TLS_CERT_B64"]},
               "tlsKeyB64":        {"value": os.environ["TLS_KEY_B64"]},
-              "dnsNameLabel":     {"value": os.environ["ACI_DNS_NAME"]}
+              "dnsNameLabel":     {"value": os.environ["ACI_DNS_NAME"]},
+              "ownerEmail":       {"value": os.environ.get("OWNER_EMAIL", "")},
+              "notifyEmail":      {"value": os.environ.get("NOTIFY_EMAIL", "")},
+              "mailSender":       {"value": os.environ.get("MAIL_SENDER", "")}
             }
           }
           with open("params.json", "w") as f:
