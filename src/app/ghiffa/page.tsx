@@ -5,10 +5,33 @@ import { connectDB } from '@/lib/mongodb';
 import { isGhiffaOwner } from '@/lib/ghiffaOwner';
 import Booking from '@/models/Booking';
 import type { Metadata } from 'next';
+import fs from 'node:fs';
+import path from 'node:path';
 import { redirect } from 'next/navigation';
 import { GhiffaContent } from './GhiffaContent';
 import type { MyRequest } from './MyRequests';
 import type { PendingRequest } from './PendingRequests';
+
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+// Shown first in the gallery; everything else follows in alphabetical order.
+const FEATURED_IMAGE = 'ewa_veranda.jpeg';
+
+function getGalleryImages(): string[] {
+  try {
+    const dir = path.join(process.cwd(), 'public', 'ghiffa', 'gallery');
+    return fs
+      .readdirSync(dir)
+      .filter((f) => IMAGE_EXTENSIONS.has(path.extname(f).toLowerCase()))
+      .sort((a, b) => {
+        if (a === FEATURED_IMAGE) return -1;
+        if (b === FEATURED_IMAGE) return 1;
+        return a.localeCompare(b);
+      })
+      .map((f) => `/ghiffa/gallery/${f}`);
+  } catch {
+    return [];
+  }
+}
 
 const ADDRESS = 'Via Cerutti 8, Ghiffa (VB), Italy';
 
@@ -104,6 +127,7 @@ export default async function GhiffaPage() {
   }
 
   const isOwner = isGhiffaOwner(session.user.email);
+  const galleryImages = getGalleryImages();
 
   const [stays, pendingRequests, myRequests] = await Promise.all([
     getUpcomingStays(),
@@ -123,6 +147,7 @@ export default async function GhiffaPage() {
           isOwner={isOwner}
           defaultName={session.user.name ?? ''}
           defaultEmail={session.user.email ?? ''}
+          galleryImages={galleryImages}
         />
       </Container>
     </main>

@@ -23,6 +23,8 @@ export type Dictionary = {
   legendConfirmed: string;
   legendPending: string;
   legendFree: string;
+  galleryPrev: string;
+  galleryNext: string;
   prevYear: string;
   nextYear: string;
   upcomingHeading: string;
@@ -65,6 +67,8 @@ const en: Dictionary = {
   legendConfirmed: 'Confirmed',
   legendPending: 'Pending',
   legendFree: 'Free',
+  galleryPrev: 'Previous photo',
+  galleryNext: 'Next photo',
   prevYear: 'Previous year',
   nextYear: 'Next year',
   upcomingHeading: 'Upcoming stays',
@@ -107,6 +111,8 @@ const pl: Dictionary = {
   legendConfirmed: 'Potwierdzone',
   legendPending: 'Oczekujące',
   legendFree: 'Wolne',
+  galleryPrev: 'Poprzednie zdjęcie',
+  galleryNext: 'Następne zdjęcie',
   prevYear: 'Poprzedni rok',
   nextYear: 'Następny rok',
   upcomingHeading: 'Nadchodzące pobyty',
@@ -152,6 +158,8 @@ const de: Dictionary = {
   legendConfirmed: 'Bestätigt',
   legendPending: 'Ausstehend',
   legendFree: 'Frei',
+  galleryPrev: 'Vorheriges Foto',
+  galleryNext: 'Nächstes Foto',
   prevYear: 'Vorheriges Jahr',
   nextYear: 'Nächstes Jahr',
   upcomingHeading: 'Anstehende Aufenthalte',

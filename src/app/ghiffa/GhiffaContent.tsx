@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { LOCALES } from './i18n';
 import { LanguageProvider, useLang } from './LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 import { MyRequests, type MyRequest } from './MyRequests';
 import { PendingRequests, type PendingRequest } from './PendingRequests';
+import { PhotoGallery } from './PhotoGallery';
 import { RequestForm } from './RequestForm';
 import type { UpcomingStay } from './page';
 import { YearCalendar } from './YearCalendar';
@@ -25,9 +25,19 @@ type Props = {
   isOwner: boolean;
   defaultName: string;
   defaultEmail: string;
+  galleryImages: string[];
 };
 
-function GhiffaBody({ address, stays, pendingRequests, myRequests, isOwner, defaultName, defaultEmail }: Props) {
+function GhiffaBody({
+  address,
+  stays,
+  pendingRequests,
+  myRequests,
+  isOwner,
+  defaultName,
+  defaultEmail,
+  galleryImages,
+}: Props) {
   const { t, lang } = useLang();
   const [selectedFrom, setSelectedFrom] = useState<string | null>(null);
   const [selectedTo, setSelectedTo] = useState<string | null>(null);
@@ -49,16 +59,7 @@ function GhiffaBody({ address, stays, pendingRequests, myRequests, isOwner, defa
           <LanguageSelector />
         </div>
 
-        <div className="mt-8 relative w-full md:w-1/2 aspect-[16/9] rounded-xl overflow-hidden shadow-md">
-          <Image
-            src="/ghiffa/veranda.jpg"
-            alt={t.title}
-            fill
-            sizes="(min-width: 768px) 50vw, 100vw"
-            className="object-cover"
-            priority
-          />
-        </div>
+        <PhotoGallery images={galleryImages} alt={t.title} />
       </section>
 
       {isOwner && (
