@@ -73,7 +73,6 @@ public/media/
 *.tsbuildinfo
 
 # Editor-specific config
-.vscode/
 
 # Yarn
 yarn-error.log
