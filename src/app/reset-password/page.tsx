@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, FormEvent } from 'react';
 
 export default function ResetPasswordRequestPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export default function ResetPasswordRequestPage() {
       const res = await fetch('/api/auth/password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ username }),
       });
       const data = await res.json();
 
@@ -45,7 +45,7 @@ export default function ResetPasswordRequestPage() {
             Reset password
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your username (email address) and we&apos;ll email you a link to choose a new password.
+            Enter your username and we&apos;ll send a link to choose a new password to the email address configured for your account.
           </p>
         </div>
         {message ? (
@@ -60,20 +60,22 @@ export default function ResetPasswordRequestPage() {
               </div>
             )}
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
+              <label htmlFor="username" className="sr-only">
+                Username
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
+                id="username"
+                name="username"
+                type="text"
                 autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 required
                 autoFocus
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             </div>
             <div>
@@ -88,7 +90,7 @@ export default function ResetPasswordRequestPage() {
           </form>
         )}
         <p className="text-center text-sm">
-          <Link href="/admin/login?method=password" className="text-indigo-600 hover:text-indigo-500">
+          <Link href="/admin/login" className="text-indigo-600 hover:text-indigo-500">
             ← Back to sign in
           </Link>
         </p>

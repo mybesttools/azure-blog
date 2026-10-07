@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
 import { connectDB } from '@/lib/mongodb';
-import User from '@/models/User';
+import PasswordReset from '@/models/PasswordReset';
+import { setEntraUserPassword } from '@/lib/m365';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -22,28 +22,33 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const passwordHash = await bcrypt.hash(password, 10);
+    const reset = await PasswordReset.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
 
-    // Matching on the token and clearing it in one atomic update makes the
-    // link single-use, even if it's submitted twice at the same time.
-    const user = await User.findOneAndUpdate(
-      {
-        passwordResetTokenHash: tokenHash,
-        passwordResetExpires: { $gt: new Date() },
-        type: 'local',
-      },
-      {
-        $set: { password: passwordHash },
-        $unset: { passwordResetTokenHash: '', passwordResetExpires: '' },
-      }
-    );
-
-    if (!user) {
+    if (!reset) {
       return NextResponse.json(
         { error: 'This reset link is invalid or has expired. Please request a new one.' },
         { status: 400 }
       );
     }
+
+    // The token is only used up once the password is actually changed, so a
+    // password Entra ID rejects (e.g. too simple) can be retried with the
+    // same link.
+    const graphError = await setEntraUserPassword(reset.entraUserId, password);
+    if (graphError) {
+      const complexity = /complex/i.test(graphError);
+      return NextResponse.json(
+        {
+          error: complexity
+            ? 'That password does not meet the requirements. Use at least 8 characters with a mix of upper and lower case letters, numbers and symbols.'
+            : 'Your password could not be changed. Please try again later.',
+        },
+        { status: complexity ? 400 : 502 }
+      );
+    }
+
+    // Also invalidates any other outstanding links for the same account.
+    await PasswordReset.deleteMany({ entraUserId: reset.entraUserId });
 
     return NextResponse.json({ success: true });
   } catch (error) {

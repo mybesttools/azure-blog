@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // Get single user by ID
     if (id) {
-      const user = await User.findById(id).select('-password -passwordResetTokenHash').lean();
+      const user = await User.findById(id).select('-password').lean();
       if (!user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Get paginated users
     const users = await User.find()
-      .select('-password -passwordResetTokenHash')
+      .select('-password')
       .sort({ [_sort]: _order })
       .skip(_start)
       .limit(_end - _start)
@@ -103,7 +103,7 @@ export async function PUT(request: NextRequest) {
       data.password = await bcrypt.hash(data.password, 10);
     }
     
-    const user = await User.findByIdAndUpdate(id, data, { new: true, runValidators: true }).select('-password -passwordResetTokenHash');
+    const user = await User.findByIdAndUpdate(id, data, { new: true, runValidators: true }).select('-password');
     
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

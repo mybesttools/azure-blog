@@ -77,7 +77,7 @@ function ResetPasswordConfirmForm() {
               <p className="text-sm text-green-800">Your password has been changed.</p>
             </div>
             <Link
-              href="/admin/login?method=password"
+              href="/admin/login"
               className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
             >
               Sign in

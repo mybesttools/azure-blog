@@ -12,6 +12,7 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@giscus/react": "^2.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@next/third-parties": "^16.2.10",
     "@shopify/hydrogen-react": "^2026.4.2",
     "@types/qrcode": "^1.5.6",
