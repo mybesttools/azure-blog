@@ -386,12 +386,18 @@ const CustomLayout = (props: any) => <Layout {...props} menu={CustomMenu} />;
 export default function AdminApp() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  // Any account in the tenant can sign in (e.g. family members using the
+  // Ghiffa page), but only admins may use the dashboard. The API routes
+  // enforce this too; this just keeps everyone else out of the UI.
+  const isAdmin = (session?.user as any)?.role === 'admin';
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/login');
+    } else if (status === 'authenticated' && !isAdmin) {
+      router.replace('/');
     }
-  }, [status, router]);
+  }, [status, isAdmin, router]);
 
   if (status === 'loading') {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
@@ -401,7 +407,7 @@ export default function AdminApp() {
     return null;
   }
 
-  if (!session) {
+  if (!session || !isAdmin) {
     return null;
   }
 

@@ -120,11 +120,13 @@ const Header = async () => {
                 role="menu"
                 className="absolute right-0 mt-2 hidden min-w-[180px] rounded-md border border-gray-200 bg-white py-2 text-sm shadow-lg group-focus-within:block md:group-hover:block dark:border-gray-700 dark:bg-gray-800"
               >
-                <li role="none">
-                  <Link role="menuitem" href="/admin" className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
-                    Admin Dashboard
-                  </Link>
-                </li>
+                {(session.user as any).role === 'admin' && (
+                  <li role="none">
+                    <Link role="menuitem" href="/admin" className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                      Admin Dashboard
+                    </Link>
+                  </li>
+                )}
                 <li role="none">
                   <form action={async () => {
                     "use server";

@@ -97,7 +97,7 @@ function ResetPasswordConfirmForm() {
               <p className="text-sm text-green-800">{t.passwordChanged}</p>
             </div>
             <Link
-              href="/admin/login"
+              href="/admin/login?callbackUrl=/"
               className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
             >
               {t.signIn}

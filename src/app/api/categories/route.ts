@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import Category from '@/models/Category';
-import { auth } from '@/auth';
+import { requireAdmin } from '@/lib/auth';
 
 // GET all categories or a single category
 export async function GET(request: NextRequest) {
@@ -66,8 +66,8 @@ export async function GET(request: NextRequest) {
 // POST - Create a new category (admin only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await requireAdmin();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
 // PUT - Update a category (admin only)
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await requireAdmin();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -116,8 +116,8 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete a category (admin only)
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await requireAdmin();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
