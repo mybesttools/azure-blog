@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { signIn, getProviders } from 'next-auth/react';
 import { Suspense, useState, useEffect, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -23,8 +24,15 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/admin';
+  // Local (password) accounts need a way past the automatic SSO redirect,
+  // e.g. right after resetting their password.
+  const passwordLogin = searchParams.get('method') === 'password';
 
   useEffect(() => {
+    if (passwordLogin) {
+      setCheckingSso(false);
+      return;
+    }
     getProviders().then((providers) => {
       if (providers?.['azure-ad']) {
         signIn('azure-ad', { callbackUrl });
@@ -32,7 +40,7 @@ function LoginForm() {
         setCheckingSso(false);
       }
     });
-  }, [callbackUrl]);
+  }, [callbackUrl, passwordLogin]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -200,6 +208,14 @@ function LoginForm() {
               </div>
             )}
           </div>
+
+          {!requireMfa && (
+            <div className="text-right text-sm">
+              <Link href="/reset-password" className="text-indigo-600 hover:text-indigo-500">
+                Forgot your password?
+              </Link>
+            </div>
+          )}
 
           <div>
             <button

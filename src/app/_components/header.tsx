@@ -141,10 +141,29 @@ const Header = async () => {
               </ul>
             </li>
           ) : (
-            <li>
-              <Link href="/admin/login" className="hover:underline font-semibold">
+            <li className="relative group">
+              <button
+                type="button"
+                className="hover:underline font-semibold focus:outline-none"
+                aria-haspopup="menu"
+              >
                 Login
-              </Link>
+              </button>
+              <ul
+                role="menu"
+                className="absolute right-0 mt-2 hidden min-w-[180px] rounded-md border border-gray-200 bg-white py-2 text-sm shadow-lg group-focus-within:block md:group-hover:block dark:border-gray-700 dark:bg-gray-800"
+              >
+                <li role="none">
+                  <Link role="menuitem" href="/admin/login" className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Sign in
+                  </Link>
+                </li>
+                <li role="none">
+                  <Link role="menuitem" href="/reset-password" className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Reset password
+                  </Link>
+                </li>
+              </ul>
             </li>
           )}
         </ul>

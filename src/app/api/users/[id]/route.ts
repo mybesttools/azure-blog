@@ -17,7 +17,7 @@ export async function GET(
     await connectDB();
     const { id } = await params;
     
-    const user = await User.findById(id).select('-password').lean();
+    const user = await User.findById(id).select('-password -passwordResetTokenHash').lean();
     
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -55,7 +55,7 @@ export async function PUT(
       updateData,
       { new: true, runValidators: true }
     )
-      .select('-password')
+      .select('-password -passwordResetTokenHash')
       .lean();
     
     if (!user) {
@@ -81,7 +81,7 @@ export async function DELETE(
     await connectDB();
     const { id } = await params;
     
-    const user = await User.findByIdAndDelete(id).select('-password').lean();
+    const user = await User.findByIdAndDelete(id).select('-password -passwordResetTokenHash').lean();
     
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

@@ -8,6 +8,9 @@ export interface IUser extends Document {
   type: 'local' | 'entraId';
   mfaEnabled: boolean;
   mfaSecret?: string;
+  passwordResetTokenHash?: string;
+  passwordResetExpires?: Date;
+  passwordResetRequestedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +51,20 @@ const UserSchema = new Schema<IUser>(
     },
     mfaSecret: {
       type: String,
+      required: false,
+    },
+    // Only a SHA-256 hash of the emailed reset token is stored, so a database
+    // leak can't be turned into working reset links.
+    passwordResetTokenHash: {
+      type: String,
+      required: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      required: false,
+    },
+    passwordResetRequestedAt: {
+      type: Date,
       required: false,
     },
   },
