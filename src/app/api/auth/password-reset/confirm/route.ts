@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
     const { token, password } = await req.json();
 
     if (!token || typeof token !== 'string') {
-      return NextResponse.json({ error: 'Reset token is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Reset token is required', code: 'invalid_token' }, { status: 400 });
     }
     if (!password || typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`, code: 'password_too_short' },
         { status: 400 }
       );
     }
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     if (!reset) {
       return NextResponse.json(
-        { error: 'This reset link is invalid or has expired. Please request a new one.' },
+        { error: 'This reset link is invalid or has expired', code: 'invalid_token' },
         { status: 400 }
       );
     }
@@ -38,11 +38,9 @@ export async function POST(req: NextRequest) {
     if (graphError) {
       const complexity = /complex/i.test(graphError);
       return NextResponse.json(
-        {
-          error: complexity
-            ? 'That password does not meet the requirements. Use at least 8 characters with a mix of upper and lower case letters, numbers and symbols.'
-            : 'Your password could not be changed. Please try again later.',
-        },
+        complexity
+          ? { error: 'Password does not meet the complexity requirements', code: 'password_complexity' }
+          : { error: 'Password could not be changed', code: 'reset_failed' },
         { status: complexity ? 400 : 502 }
       );
     }
@@ -53,6 +51,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Password reset confirm error:', error);
-    return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to reset password', code: 'reset_failed' }, { status: 500 });
   }
 }

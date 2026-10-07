@@ -4,6 +4,8 @@ import { connectDB } from '@/lib/mongodb';
 import PasswordReset from '@/models/PasswordReset';
 import { getEntraUser } from '@/lib/m365';
 import { sendMail } from '@/lib/mail';
+import type { Lang } from '@/app/ghiffa/i18n';
+import { RESET_EMAIL } from '@/app/reset-password/i18n';
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between emails per account
@@ -13,12 +15,13 @@ const RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between emails per account
 const UPN_PATTERN = /^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 // Always answers the same way, whether or not the account exists, so this
-// endpoint can't be used to find out which usernames have an account.
+// endpoint can't be used to find out which usernames have an account. The
+// page shows its own translated text rather than this message.
 const GENERIC_RESPONSE = {
   message: 'If that account exists and has an email address configured, a password reset link has been sent to it.',
 };
 
-async function sendResetLink(username: string) {
+async function sendResetLink(username: string, lang: Lang) {
   const user = await getEntraUser(username);
   if (!user || !user.accountEnabled || !user.mail) {
     return;
@@ -44,37 +47,27 @@ async function sendResetLink(username: string) {
   // Never derive the link from the request's Host header - an attacker could
   // spoof it and have the real token emailed inside a link to their own site.
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || '').replace(/\/$/, '');
-  const resetUrl = `${siteUrl}/reset-password/confirm?token=${token}`;
+  const resetUrl = `${siteUrl}/reset-password/confirm?token=${token}&lang=${lang}`;
 
-  await sendMail({
-    to: user.mail,
-    subject: 'Reset your MyBestTools password',
-    text: [
-      `Hi ${user.displayName || user.userPrincipalName},`,
-      '',
-      `Someone (hopefully you) asked to reset the password for ${user.userPrincipalName}.`,
-      'Use this link to choose a new password. It expires in 1 hour and can only be used once:',
-      '',
-      resetUrl,
-      '',
-      "If you didn't ask for this, you can ignore this email - your password won't change.",
-    ].join('\n'),
-  });
+  const { subject, text } = RESET_EMAIL[lang](user.displayName || user.userPrincipalName, user.userPrincipalName, resetUrl);
+  await sendMail({ to: user.mail, subject, text });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { username } = await req.json();
+    const { username, lang: requestedLang } = await req.json();
+    // Same default as the Ghiffa page the language choice is shared with.
+    const lang: Lang = requestedLang === 'en' || requestedLang === 'de' ? requestedLang : 'pl';
 
     if (!username || typeof username !== 'string') {
-      return NextResponse.json({ error: 'Username is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Username is required', code: 'username_required' }, { status: 400 });
     }
 
     const normalized = username.trim().toLowerCase();
     if (UPN_PATTERN.test(normalized)) {
       // Not awaited, so the response time doesn't reveal whether the account
       // exists or an email was sent.
-      sendResetLink(normalized).catch((error) => console.error('[password-reset] request failed:', error));
+      sendResetLink(normalized, lang).catch((error) => console.error('[password-reset] request failed:', error));
     }
 
     return NextResponse.json(GENERIC_RESPONSE);
